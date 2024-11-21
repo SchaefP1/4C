@@ -17,6 +17,7 @@
 #include "4C_contact_lagrange_strategy_wear.hpp"
 #include "4C_contact_nitsche_strategy.hpp"
 #include "4C_contact_nitsche_strategy_poro.hpp"
+#include "4C_contact_nitsche_strategy_poro_scatra.hpp"
 #include "4C_contact_nitsche_strategy_ssi.hpp"
 #include "4C_contact_nitsche_strategy_ssi_elch.hpp"
 #include "4C_contact_paramsinterface.hpp"
@@ -596,6 +597,10 @@ void CONTACT::STRATEGY::Factory::read_and_check_input(Teuchos::ParameterList& pa
     {
       params.set<int>("PROBTYPE", Inpar::CONTACT::ssi);
     }
+  }
+  else if (problemtype == Core::ProblemType::poroscatra)
+  {
+    params.set<int>("PROBTYPE", Inpar::CONTACT::poroscatra);
   }
   else if (problemtype == Core::ProblemType::poroelast or problemtype == Core::ProblemType::fpsi or
            problemtype == Core::ProblemType::fpsi_xfem)
@@ -1351,12 +1356,6 @@ void CONTACT::STRATEGY::Factory::set_poro_parent_element(
       {
         if (faceele->parent_element()->id() == eleitergeometry->second->id())
         {
-          if (mastertype == Mortar::Element::poro)
-          {
-            FOUR_C_THROW(
-                "struct and poro master elements on the same processor - no mixed interface "
-                "supported");
-          }
           cele.phys_type() = Mortar::Element::poro;
           mastertype = Mortar::Element::poro;
           break;
@@ -1634,6 +1633,12 @@ std::shared_ptr<CONTACT::AbstractStrategy> CONTACT::STRATEGY::Factory::build_str
       data_ptr = std::make_shared<CONTACT::AbstractStrategyDataContainer>();
       strategy_ptr = std::make_shared<NitscheStrategyPoro>(
           data_ptr, dof_row_map, node_row_map, params, interfaces, dim, comm_ptr, 0, dof_offset);
+    }
+    else if (params.get<int>("PROBTYPE") == Inpar::CONTACT::poroscatra)
+    {
+      data_ptr = Teuchos::rcp(new CONTACT::AbstractStratDataContainer());
+      strategy_ptr = Teuchos::rcp(new NitscheStrategyPoroScatra(
+          data_ptr, dof_row_map, node_row_map, params, interfaces, dim, comm_ptr, 0, dof_offset));
     }
     else
     {
