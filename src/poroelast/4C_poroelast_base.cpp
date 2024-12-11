@@ -242,7 +242,11 @@ void PoroElast::PoroBase::read_restart(const int step)
 {
   if (step)
   {
-    if (not oldstructimint_) structure_->setup();
+    // in case of submeshes, we need to rebuild the subproxies, also (they are reset during restart)
+    if (submeshes_)
+      replace_dof_sets();
+    else if (not oldstructimint_)
+      structure_->setup();
 
     // apply current velocity and pressures to structure
     set_fluid_solution();
@@ -251,21 +255,6 @@ void PoroElast::PoroBase::read_restart(const int step)
 
     fluid_field()->read_restart(step);
     structure_field()->read_restart(step);
-
-    // in case of submeshes, we need to rebuild the subproxies, also (they are reset during restart)
-    if (submeshes_) replace_dof_sets();
-
-    // apply current velocity and pressures to structure
-    set_fluid_solution();
-    // apply current structural displacements to fluid
-    set_struct_solution();
-
-    // second read_restart needed due to the coupling variables
-    fluid_field()->read_restart(step);
-    structure_field()->read_restart(step);
-
-    // in case of submeshes, we need to rebuild the subproxies, also (they are reset during restart)
-    if (submeshes_) replace_dof_sets();
 
     // set the current time in the algorithm (taken from fluid field)
     set_time_step(fluid_field()->time(), step);
@@ -531,6 +520,8 @@ void PoroElast::PoroBase::replace_dof_sets()
 
   fluiddis->fill_complete(true, true, true);
   structdis->fill_complete(true, true, true);
+
+  if (!oldstructimint_) structure_->setup();
 }
 
 void PoroElast::PoroBase::check_for_poro_conditions()
