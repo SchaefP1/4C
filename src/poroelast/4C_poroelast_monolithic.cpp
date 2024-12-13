@@ -14,6 +14,7 @@
 #include "4C_contact_meshtying_contact_bridge.hpp"
 #include "4C_contact_meshtying_poro_lagrange_strategy.hpp"
 #include "4C_contact_nitsche_strategy_poro.hpp"
+#include "4C_contact_nitsche_strategy_poro_scatra.hpp"
 #include "4C_fem_general_assemblestrategy.hpp"
 #include "4C_fem_general_elements_paramsminimal.hpp"
 #include "4C_fluid_ele_action.hpp"
@@ -410,6 +411,17 @@ void PoroElast::Monolithic::setup_system()
     {
       nit_contact_ = true;
       no_penetration_ = contact_strategy_nitsche_poro->has_poro_no_penetration();
+    }
+    else
+    {
+      std::shared_ptr<CONTACT::NitscheStrategyPoroScatra> contact_strategy_nitsche_poro_scatra =
+          std::dynamic_pointer_cast<CONTACT::NitscheStrategyPoroScatra>(
+              model_evaluator_contact.strategy_ptr());
+      if (contact_strategy_nitsche_poro_scatra != nullptr)
+      {
+        nit_contact_ = true;
+        no_penetration_ = contact_strategy_nitsche_poro_scatra->has_poro_no_penetration();
+      }
     }
   }
 
@@ -1880,6 +1892,28 @@ void PoroElast::Monolithic::set_poro_contact_states()
       contact_strategy_nitsche_poro->set_parent_state(
           Mortar::state_svelocity, *structure_field()->velnp(), *struct_dis);
     }
+    else
+    {
+      std::shared_ptr<CONTACT::NitscheStrategyPoroScatra> contact_strategy_nitsche_poro_scatra =
+          std::dynamic_pointer_cast<CONTACT::NitscheStrategyPoroScatra>(
+              model_evaluator_contact.strategy_ptr());
+      if (contact_strategy_nitsche_poro_scatra != nullptr)
+      {
+        std::shared_ptr<Core::FE::Discretization> poro_dis =
+            Global::Problem::instance()->get_dis("porofluid");
+        if (poro_dis == nullptr) FOUR_C_THROW("didn't get my poro discretization");
+
+        contact_strategy_nitsche_poro_scatra->set_parent_state(
+            Mortar::state_fvelocity, *fluid_field()->velnp(), *poro_dis);
+
+        std::shared_ptr<Core::FE::Discretization> struc_dis =
+            Global::Problem::instance()->get_dis("structure");
+        if (struc_dis == nullptr) FOUR_C_THROW("didn't get my structure discretization");
+
+        contact_strategy_nitsche_poro_scatra->set_parent_state(
+            Mortar::state_svelocity, *structure_field()->velnp(), *struc_dis);
+      }
+    }
   }
 }
 
@@ -2013,6 +2047,36 @@ void PoroElast::Monolithic::eval_poro_mortar()
       extractor()->add_vector(
           *contact_strategy_nitsche_poro->get_rhs_block_ptr(CONTACT::VecBlockType::porofluid), 1,
           *rhs_);
+    }
+    else
+    {
+      std::shared_ptr<CONTACT::NitscheStrategyPoroScatra> contact_strategy_nitsche_poro_scatra =
+          std::dynamic_pointer_cast<CONTACT::NitscheStrategyPoroScatra>(
+              model_evaluator_contact.strategy_ptr());
+
+      if (contact_strategy_nitsche_poro_scatra != nullptr)
+      {
+        systemmatrix_->un_complete();
+
+        systemmatrix_->matrix(0, 1).add(*contact_strategy_nitsche_poro_scatra->get_matrix_block_ptr(
+                                            CONTACT::MatBlockType::displ_porofluid),
+            false, 1.0, 1.0);
+
+        systemmatrix_->matrix(1, 1).add(*contact_strategy_nitsche_poro_scatra->get_matrix_block_ptr(
+                                            CONTACT::MatBlockType::porofluid_porofluid),
+            false, 1.0, 1.0);
+
+        systemmatrix_->matrix(1, 0).add(*contact_strategy_nitsche_poro_scatra->get_matrix_block_ptr(
+                                            CONTACT::MatBlockType::porofluid_displ),
+            false, 1.0, 1.0);
+
+        systemmatrix_->complete();
+
+
+        extractor()->add_vector(*contact_strategy_nitsche_poro_scatra->get_rhs_block_ptr(
+                                    CONTACT::VecBlockType::porofluid),
+            1, *rhs_);
+      }
     }
   }
 }

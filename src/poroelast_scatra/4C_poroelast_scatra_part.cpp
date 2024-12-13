@@ -85,11 +85,12 @@ void PoroElastScaTra::PoroScatraPart::set_poro_solution()
       velnp = volcoupl_fluidscatra_->apply_vector_mapping21(*poro_->fluid_field()->velnp());
     }
 
-    contact_strategy_nitsche_->set_state(Mortar::state_fvelocity, *velnp);
+    //    contact_strategy_nitsche_->set_state(Mortar::state_fvelocity, *velnp);
 
     // structure velocity
-    std::shared_ptr<const Core::LinAlg::Vector<double>> svel = poro_->structure_field()->velnp();
-    contact_strategy_nitsche_->set_state(Mortar::state_svelocity, *svel);
+    //    std::shared_ptr<const Core::LinAlg::Vector<double>> svel =
+    //    poro_->structure_field()->velnp();
+    //    contact_strategy_nitsche_->set_state(Mortar::state_svelocity, *svel);
   }
 }
 
@@ -110,8 +111,9 @@ void PoroElastScaTra::PoroScatraPart::set_scatra_solution()
 
   scatra_->scatra_field()->discretization()->set_state("phinp", phinp_s);
 
-  // set scatra solution for contact
-  if (ssi_interface_contact())
+  // set scatra solution for contact, the 2nd check is need during restart when
+  // contact_strategy_nitsche_ isn't set yet
+  if (ssi_interface_contact() && !(contact_strategy_nitsche_ == nullptr))
   {
     contact_strategy_nitsche_->set_state(Mortar::state_scalar, *phinp_s);
   }

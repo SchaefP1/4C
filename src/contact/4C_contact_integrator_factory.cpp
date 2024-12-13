@@ -55,8 +55,8 @@ std::shared_ptr<CONTACT::Integrator> CONTACT::INTEGRATOR::Factory::build_integra
         double porotimefac =
             1 / (stru.sublist("ONESTEPTHETA").get<double>("THETA") * stru.get<double>("TIMESTEP"));
         mortar_params.set<double>("porotimefac", porotimefac);
-        mortar_params.set<bool>(
-            "CONTACTNOPEN", porodyn.get<bool>("CONTACTNOPEN"));  // used in the integrator
+        mortar_params.set<bool>("CONTACT_NO_PENETRATION",
+            porodyn.get<bool>("CONTACT_NO_PENETRATION"));  // used in the integrator
         integrator =
             std::make_shared<CONTACT::IntegratorNitschePoroScatra>(mortar_params, slave_type, comm);
       }

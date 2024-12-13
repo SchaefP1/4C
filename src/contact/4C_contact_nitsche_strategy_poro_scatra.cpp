@@ -27,8 +27,8 @@ CONTACT::NitscheStrategyPoroScatra::NitscheStrategyPoroScatra(const Epetra_Map* 
     double alphaf, int maxdof)
     : CONTACT::NitscheStrategySsi(
           dof_row_map, NodeRowMap, params, std::move(interface), dim, comm, alphaf, maxdof),
-      no_penetration_(
-          Global::Problem::instance()->poroelast_dynamic_params().get<bool>("CONTACTNOPEN"))
+      no_penetration_(Global::Problem::instance()->poroelast_dynamic_params().get<bool>(
+          "CONTACT_NO_PENETRATION"))
 {
 }
 
@@ -39,8 +39,8 @@ CONTACT::NitscheStrategyPoroScatra::NitscheStrategyPoroScatra(
     double alphaf, int maxdof)
     : CONTACT::NitscheStrategySsi(data_ptr, dof_row_map, NodeRowMap, params, std::move(interface),
           dim, comm, alphaf, maxdof),
-      no_penetration_(
-          Global::Problem::instance()->poroelast_dynamic_params().get<bool>("CONTACTNOPEN"))
+      no_penetration_(Global::Problem::instance()->poroelast_dynamic_params().get<bool>(
+          "CONTACT_NO_PENETRATION"))
 {
 }
 

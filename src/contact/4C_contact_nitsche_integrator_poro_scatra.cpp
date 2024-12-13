@@ -34,7 +34,7 @@ FOUR_C_NAMESPACE_OPEN
 CONTACT::IntegratorNitschePoroScatra::IntegratorNitschePoroScatra(
     Teuchos::ParameterList& params, Core::FE::CellType eletype, MPI_Comm comm)
     : IntegratorNitsche(params, eletype, comm),
-      no_penetration_(params.get<bool>("CONTACTNOPEN")),
+      no_penetration_(params.get<bool>("CONTACT_NO_PENETRATION")),
       dv_dd_(params.get<double>("porotimefac")),
       scatraparamstimint_(Discret::Elements::ScaTraEleParameterTimInt::instance("scatra")),
       scatraparamsboundary_(Discret::Elements::ScaTraEleParameterBoundary::instance("scatra"))
@@ -60,8 +60,13 @@ void CONTACT::IntegratorNitschePoroScatra::integrate_gp_3d(Mortar::Element& sele
   // We use the consistent element normal for poro contact!
   // if (nit_normal_==Inpar::CONTACT::NitNor_ele)
   {
+    double n[3];
+    sele.compute_unit_normal_at_xi(sxi, n);
+    std::vector<Core::Gen::Pairedvector<int, double>> dn(3, sele.num_node() * 3);
+    dynamic_cast<CONTACT::Element&>(sele).deriv_unit_normal_at_xi(sxi, dn);
+
     gpts_forces<3>(sele, mele, sval, sderiv, derivsxi, mval, mderiv, derivmxi, jac, derivjac, wgt,
-        gap, deriv_gap, normal, dnmap_unit, sxi, mxi);
+        gap, deriv_gap, n, dn, sxi, mxi);
   }
   //  else if (nit_normal_==Inpar::CONTACT::NitNor_sm)
   //    FOUR_C_THROW("Want to use the element normal!");
@@ -204,6 +209,22 @@ void CONTACT::IntegratorNitschePoroScatra::so_ele_cauchy(Mortar::Element& moEle,
       FOUR_C_THROW("The element is not So3PoroScatra");
     }
   }
+  else if (moEle.mo_data().parent_scalar().size() > 0)
+  {
+    if (auto* solid_ele = dynamic_cast<
+            Discret::Elements::So3PoroScatra<Discret::Elements::SoHex8, Core::FE::CellType::hex8>*>(
+            moEle.parent_element());
+        solid_ele != nullptr)
+    {
+      solid_ele->get_cauchy_n_dir_and_derivatives_at_xi(pxsi, moEle.mo_data().parent_disp(),
+          moEle.mo_data().parent_pf_pres(), moEle.mo_data().parent_scalar(), normal, direction,
+          sigma_nt, &dsntdd, nullptr, &dsntds, &dsntdn, &dsntdt, &dsntdpxi);
+    }
+    else
+    {
+      FOUR_C_THROW("The element is not So3PoroScatra");
+    }
+  }
   else
   {
     switch (moEle.parent_element()->shape())
@@ -218,7 +239,7 @@ void CONTACT::IntegratorNitschePoroScatra::so_ele_cauchy(Mortar::Element& moEle,
               &dsntdt, &dsntdpxi, nullptr, nullptr, nullptr, nullptr, nullptr);
         }
         else if (auto* solid_ele = dynamic_cast<Discret::Elements::Solid*>(moEle.parent_element());
-                 solid_ele != nullptr)
+            solid_ele != nullptr)
         {
           Discret::Elements::CauchyNDirLinearizations<3> cauchy_linearizations{};
           cauchy_linearizations.d_cauchyndir_dd = &dsntdd;
@@ -258,14 +279,14 @@ void CONTACT::IntegratorNitschePoroScatra::so_ele_cauchy(Mortar::Element& moEle,
   for (int d = 0; d < dim; ++d)
   {
     for (Core::Gen::Pairedvector<int, double>::const_iterator p = normal_deriv[d].begin();
-         p != normal_deriv[d].end(); ++p)
+        p != normal_deriv[d].end(); ++p)
       deriv_sigma_nt_d[p->first] += dsntdn(d) * p->second * w;
   }
 
   for (int d = 0; d < dim; ++d)
   {
     for (Core::Gen::Pairedvector<int, double>::const_iterator p = direction_deriv[d].begin();
-         p != direction_deriv[d].end(); ++p)
+        p != direction_deriv[d].end(); ++p)
       deriv_sigma_nt_d[p->first] += dsntdt(d) * p->second * w;
   }
 
@@ -297,6 +318,8 @@ void CONTACT::IntegratorNitschePoroScatra::integrate_test(const double fac, Mort
   CONTACT::IntegratorNitsche::integrate_test<dim>(fac, ele, shape, deriv, dxi, jac, jacintcellmap,
       wgt, test_val, test_deriv_d, test_dir, test_dir_deriv);
 
+  if (!no_penetration_) return;
+
   for (const auto& p : test_deriv_p)
   {
     double* row = ele.get_nitsche_container().kdp(p.first);
@@ -327,7 +350,7 @@ void CONTACT::IntegratorNitschePoroScatra::integrate_poro_no_out_flow(const doub
 
   if (!ele.mo_data().parent_pf_dof().size()) return;
 
-  // weighting for poro pressure depenent if two or onesided porocontact
+  // weighting for poro pressure dependent if two or onesided porocontact
   double sweight = 1;
   double oweight = 0;
 
@@ -495,7 +518,7 @@ bool CONTACT::IntegratorNitschePoroScatra::get_poro_pressure(Mortar::Element& el
   else if (otherele.mo_data().parent_pf_dof().size())
     w1 = 0.0;
   else
-    FOUR_C_THROW("Thats not exptected...!");
+    FOUR_C_THROW("Thats not expected...!");
   double w2 = 1.0 - w1;
 
   poropressure = 0.0;
