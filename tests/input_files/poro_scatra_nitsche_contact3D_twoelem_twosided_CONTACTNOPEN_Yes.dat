@@ -1,31 +1,15 @@
 ------------------------------------------------------PROBLEM SIZE
 DIM           3
-----------------------------------------------------DISCRETISATION
-NUMFLUIDDIS                     1
-NUMSTRUCDIS                     1
-NUMALEDIS                       1
-NUMARTNETDIS                    1
-NUMTHERMDIS                     1
-NUMAIRWAYSDIS                   1
 ------------------------------------------------------PROBLEM TYPE
 PROBLEMTYPE                     Poroelastic_scalar_transport
 RESTART                         0
 SHAPEFCT                        Polynomial
-RANDSEED                        -1
 ----------------------------------------------------------------IO
 OUTPUT_BIN                      yes
 STRUCT_DISP                     Yes
-STRUCT_VEL_ACC                  No
 STRUCT_STRESS                   cauchy
 STRUCT_COUPLING_STRESS          Yes
-STRUCT_STRAIN                   No
-STRUCT_PLASTIC_STRAIN           No
-STRUCT_SURFACTANT               No
 FLUID_STRESS                    Yes
-FLUID_WALL_SHEAR_STRESS         No
-THERM_TEMPERATURE               No
-THERM_HEATFLUX                  None
-THERM_TEMPGRAD                  None
 FILESTEPS                       1000
 STDOUTEVRY                      1
 WRITE_TO_SCREEN                 Yes
@@ -35,14 +19,9 @@ LIMIT_OUTP_TO_PROC              -1
 ------------------------------------------------STRUCTURAL DYNAMIC
 INT_STRATEGY                    Standard
 DYNAMICTYPE                     OneStepTheta
-RESULTSEVRY                     1
-RESEVRYERGY                     0
-RESTARTEVRY                     1
-NUMSTEP                         10
-MAXTIME                         5
+RESULTSEVRY                     5
+RESTARTEVRY                     5
 DAMPING                         Material
-M_DAMP                          -1
-K_DAMP                          -1
 STC_SCALING                     no
 STC_LAYER                       1
 PTCDT                           0.1
@@ -52,10 +31,8 @@ MINITER                         0
 ITERNORM                        L2
 DIVERCONT                       stop
 NLNSOL                          fullnewton
-LOADLIN                         no
-MASSLIN                         no
 PREDICT                         ConstDis
-LINEAR_SOLVER                   2
+LINEAR_SOLVER                   1
 TIMESTEP                        0.5
 ---------------------------------------------------MORTAR COUPLING
 ALGORITHM                       gpts
@@ -73,21 +50,15 @@ MAX_BALANCE_EVAL_TIME           2
 MIN_ELEPROC                     0
 GHOSTING_STRATEGY               redundant_master
 ---------------------------------------------------CONTACT DYNAMIC
-LINEAR_SOLVER                   4
-ADHESION                        None
-FRICTION                        None
-FRLESS_FIRST                    No
-GP_SLIP_INCR                    No
+LINEAR_SOLVER                   1
 STRATEGY                        Nitsche
 SYSTEM                          Condensed
 PENALTYPARAM                    1
-CONTACTFORCE_ENDTIME            No
-VELOCITY_UPDATE                 No
 EMOUTPUT                        None
 NORMCOMBI_RESFCONTCONSTR        And
 NORMCOMBI_DISPLAGR              And
 TOLCONTCONSTR                   1e-06
-NITSCHE_WEIGHTING harmonic
+NITSCHE_WEIGHTING               harmonic
 TOLLAGR                         1e-06
 -----------------------------------STRUCTURAL DYNAMIC/ONESTEPTHETA
 THETA                           1
@@ -97,7 +68,7 @@ PHYSICAL_TYPE                   Poro
 RESTARTEVRY                     1
 ITEMAX                          100
 ITEMIN                          1
-RESULTSEVRY                           1
+RESULTSEVRY                     5
 TOLRES_GLOBAL                   1e-7
 TOLINC_GLOBAL                   1e-7
 NORM_INC                        AbsGlobal
@@ -109,7 +80,7 @@ CONTACTNOPEN                    Yes
 LINEAR_SOLVER                   1
 -----------------------------------------------------FLUID DYNAMIC
 PHYSICAL_TYPE                   Incompressible
-LINEAR_SOLVER                   3
+LINEAR_SOLVER                   1
 SIMPLER_SOLVER                  -1
 TIMEINTEGR                      One_Step_Theta
 NONLINITER                      Newton
@@ -121,13 +92,11 @@ MESHTYING                       no
 GRIDVEL                         OST
 ALLDOFCOUPLED                   Yes
 COMPUTE_DIVU                    No
-RESULTSEVRY                           1
+RESULTSEVRY                     1
 TIMESTEP                        0.5
 RESTARTEVRY                     20
 NUMSTEP                         1
-STEADYSTEP                      -1
 NUMSTASTEPS                     0
-STARTFUNCNO                     -1
 INITSTATITEMAX                  5
 GAMMA                           1
 THETA                           1
@@ -153,10 +122,10 @@ LOMA_CONTI_SUPG                 No
 LOMA_CONTI_CROSS_STRESS         no_cross
 LOMA_CONTI_REYNOLDS_STRESS      no_reynolds
 ----------------------------------------------------------POROSCATRA CONTROL
-RESULTSEVRY                     1
-RESTARTEVRY                     1
+RESULTSEVRY                     5
+RESTARTEVRY                     5
 NUMSTEP                         10
-MAXTIME                         30
+MAXTIME                         5
 TIMESTEP                        0.5
 COUPALGO                        two_way
 TOLINC_GLOBAL                   1e-05
@@ -172,16 +141,6 @@ SKIPINITDER                     Yes
 CONVTOL                         1e-9
 ----------------------------------------------------------SOLVER 1
 SOLVER                          UMFPACK
-NAME                            Poro_monolithic
-----------------------------------------------------------SOLVER 2
-SOLVER                          UMFPACK
-NAME                            structural solver
-----------------------------------------------------------SOLVER 3
-SOLVER                          UMFPACK
-NAME                            FluidSolver
-----------------------------------------------------------SOLVER 4
-SOLVER                          UMFPACK
-NAME                            contact
 ---------------------------------------------------------MATERIALS
 MAT 1 MAT_StructPoro MATID 2 POROLAWID 10 INITPOROSITY 0.5
 MAT 10 MAT_PoroLawConstant
@@ -239,7 +198,7 @@ E 5 -
 -------------------------------DESIGN S2I KINETICS SURF CONDITIONS
 DSURF  2
 // left_block_side_of_interface
-E 3 - 1 Slave KINETIC_MODEL ConstantPermeability NUMSCAL 1 PERMEABILITIES 0.0e-1 IS_PSEUDO_CONTACT 0
+E 3 - 1 Slave KINETIC_MODEL ConstantPermeability NUMSCAL 1 PERMEABILITIES 1.0e-1 IS_PSEUDO_CONTACT 0
 // right_block_side_of_interface
 E 2 - 1 Master
 ----------------------DESIGN SSI INTERFACE CONTACT SURF CONDITIONS
