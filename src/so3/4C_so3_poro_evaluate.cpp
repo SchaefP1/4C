@@ -985,7 +985,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::gauss_point_loop_od(
       double density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt;
       std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
           std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
-      // std::cout << "Next call ComputeMasstransfer from Solid OD" << std::endl;
+
       masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ,
           density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt);
     }
@@ -1965,7 +1965,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
       double density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt;
       std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
           std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
-      // std::cout << "Next call ComputeMasstransfer from Solid not OD" << std::endl;
+
       masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ,
           density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt);
     }

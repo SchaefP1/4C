@@ -192,8 +192,8 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     {
       temperature = scalars->at(2);
       rho_s = scalars->at(1);
-      std::cout << "temperature " << temperature << std::endl;
-      // save value to use it later or when called without scalar available
+      // std::cout << "temperature " << temperature << std::endl;
+      //  save value to use it later or when called without scalar available
       temperature_current_[gp] = temperature;
       rho_s_current_[gp] = rho_s;
     }
@@ -245,14 +245,14 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     //      ddensity_dp = MH_over_R / temperature_current_[gp];
     //      ddensity_dT = -MH_over_R * press / temperature_current_[gp] / temperature_current_[gp];
     //    }
-    std::cout << "abc " << rho_s_current_[gp] << " " << temperature_current_[gp] << " " << press
-              << " " << std::endl;
+    // std::cout << "abc " << rho_s_current_[gp] << " " << temperature_current_[gp] << " " << press
+    //          << " " << std::endl;
   }
   else
     FOUR_C_THROW(
         "Type of function specified by functionID %d not implemented", params_->functionID_);
-  std::cout << "end " << masstransferRate << std::endl;
-  std::cout << "temperature_current_ address " << &temperature_current_ << std::endl;
+  // std::cout << "end " << masstransferRate << std::endl;
+  // std::cout << "temperature_current_ adress " << &temperature_current_ << std::endl;
 
   if (params_->compressibleID_ == 0)
   {
