@@ -18,8 +18,6 @@
 
 #include <Epetra_SerialDenseSolver.h>
 
-#include <cmath>
-
 FOUR_C_NAMESPACE_OPEN
 
 
@@ -31,7 +29,9 @@ Mat::PAR::MyExpansionTest_ElastHyper::MyExpansionTest_ElastHyper(
       nummat_elastiniso_(matdata.parameters.get<int>("NUMMATEL3D")),
       matids_elastiniso_(matdata.parameters.get<std::vector<int>>("MATIDSEL3D")),
       density_(matdata.parameters.get<double>("DENS")),
-      exp_rate_(matdata.parameters.get<double>("EXPRATE"))
+      exp_rate_(matdata.parameters.get<double>("EXPRATE")),
+      rho_0_(matdata.parameters.get<double>("rho_0")),
+      rho_ss_(matdata.parameters.get<double>("rho_ss"))
 {
 }
 
@@ -193,15 +193,14 @@ void Mat::MyExpansionTest_ElastHyper::evaluate_cauchy_n_dir_and_derivatives(
   cauchy_n_dir = 0.0;
   double temperature = 293.15;
   double temperature_0 = 293.15;
-  double rho_s = 0.0;
-  double rho_ss = 8520.0;
-  double rho_s0 = 8400.0;
-  double scaling_factor = 1.0;
+  // double rho_s = 0.0;
+  double rho_ss = params_->rho_ss_;
+  double rho_s0 = params_->rho_0_;
 
   double alpha_temp = 13.0e-6;  // this is the value for steel just to test
-  double alpha_reaction = 0.065;
-  scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
-                   (1.0 + alpha_reaction * (rho_average_ - rho_s0) / (rho_ss - rho_s0));
+  double alpha_reaction = params_->exp_rate_;
+  double scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
+                          (1.0 + alpha_reaction * (rho_average_ - rho_s0) / (rho_ss - rho_s0));
 
   // std::cout << "evaluate_cauchy_n_dir_and_derivatives " << rho_average_ << " " << scaling_factor
   // << std::endl;
@@ -394,12 +393,11 @@ void Mat::MyExpansionTest_ElastHyper::evaluate(const Core::LinAlg::Matrix<3, 3>*
   double temperature = 1.0;
   double temperature_0 = 293.15;
   double rho_s = 0.0;
-  double rho_ss = 8520.0;
-  double rho_s0 = 8400.0;
-  double scaling_factor = 1.0;
+  double rho_ss = params_->rho_ss_;
+  double rho_s0 = params_->rho_0_;
 
   double alpha_temp = 13.0e-6;  // this is the value for steel just to test
-  double alpha_reaction = 0.065;
+  double alpha_reaction = params_->exp_rate_;
 
   // TODO: do not read from parameter list!
   if (params.isParameter("scalar"))
@@ -416,9 +414,10 @@ void Mat::MyExpansionTest_ElastHyper::evaluate(const Core::LinAlg::Matrix<3, 3>*
       FOUR_C_THROW("Not enough scalars to use my expansion test material");
     }
   }
-  rho_average_ = rho_s;  // only works for homogeneous exp. TODO change
-  scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
-                   (1.0 + alpha_reaction * (rho_s - rho_s0) / (rho_ss - rho_s0));
+
+  rho_average_ = rho_s;  // only works for homogeneous exp. only used for contact TODO change
+  double scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
+                          (1.0 + alpha_reaction * (rho_s - rho_s0) / (rho_ss - rho_s0));
 
   //  set-up inverse expansion tensor
   Core::LinAlg::Matrix<3, 3> iFexpM(true);

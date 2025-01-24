@@ -627,6 +627,29 @@ void Discret::Elements::So3Poro<So3Ele, distype>::gauss_point_loop(Teuchos::Para
     static Core::LinAlg::Matrix<numdim_, 1> velint;
     velint.multiply(nodalvel, shapefct);
 
+    // scalar at integration point
+    std::vector<double> myscalar = params.get<std::vector<double>>("scalarNodal");
+    const int n_scalar = 3;  // number scalar is hard coded TODO fix me
+    Core::LinAlg::Matrix<n_scalar, numnod_> nodalscalar;
+
+    for (int i = 0; i < numnod_; i++)
+      for (int j = 0; j < n_scalar; j++) nodalscalar(j, i) = myscalar[i * n_scalar + j];
+
+    //    nodalscalar.print(std::cout);
+
+    static Core::LinAlg::Matrix<n_scalar, 1> scalarint;
+    scalarint.multiply(nodalscalar, shapefct);
+
+    //    scalarint.print(std::cout);
+
+    std::shared_ptr<std::vector<double>> scalar =
+        std::make_shared<std::vector<double>>(n_scalar, 0.0);
+    for (int j = 0; j < n_scalar; j++) scalar->at(j) = scalarint(j, 0);
+
+    //    Teuchos::RCP<std::vector<double>> scalar_ptr = Teuchos::rcp(scalar);
+    params.set("scalar", scalar);
+
+
     // fluid velocity at integration point
     static Core::LinAlg::Matrix<numdim_, 1> fvelint;
     fvelint.multiply(evelnp, shapefct);

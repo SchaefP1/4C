@@ -11,6 +11,7 @@
 #include "4C_global_data.hpp"
 #include "4C_mat_my_expansion_test.hpp"
 #include "4C_mat_par_bundle.hpp"
+#include "4C_utils_function.hpp"
 
 #include <vector>
 
@@ -25,7 +26,9 @@ Mat::PAR::StructPoroMasstransfer::StructPoroMasstransfer(
       compressibleID_(matdata.parameters.get<int>("COMPRESSIBLEID")),
       factor_comp_(matdata.parameters.get<double>("FACTORCOMP")),
       reaction_start_time_(matdata.parameters.get<double>("STARTTIME")),
-      rateConstant_(matdata.parameters.get<double>("RATECONSTANT"))
+      rateConstant_(matdata.parameters.get<double>("RATECONSTANT")),
+      funct_id_mass_source_(matdata.parameters.get<int>("FUNCTIDMASSOURCE")),
+      funct_id_eos_(matdata.parameters.get<int>("FUNCTIDCOMP"))
 {
 }
 
@@ -70,6 +73,7 @@ void Mat::StructPoroMasstransfer::poro_setup(
   density_n_.resize(numgp);
   density_current_.resize(numgp);
   temperature_current_.resize(numgp);
+  phi1_current_.resize(numgp);
   rho_s_current_.resize(numgp);
   dtemperature_dt_.resize(numgp);
   density_set_flag.resize(numgp);
@@ -78,9 +82,26 @@ void Mat::StructPoroMasstransfer::poro_setup(
   std::fill(density_n_.begin(), density_n_.end(), 1.0);
   std::fill(density_current_.begin(), density_current_.end(), 1.0);
   std::fill(temperature_current_.begin(), temperature_current_.end(), 1.0);
+  std::fill(phi1_current_.begin(), phi1_current_.end(), 1.0);
   std::fill(rho_s_current_.begin(), rho_s_current_.end(), 0.0);
   std::fill(dtemperature_dt_.begin(), dtemperature_dt_.end(), 0.0);
   std::fill(density_set_flag.begin(), density_set_flag.end(), false);
+
+  const int funct_id_mass_source = params_->funct_id_mass_source_;
+  if (funct_id_mass_source != 0)
+  {
+    masstransfer_function_ =
+        &Global::Problem::instance()->function_by_id<Core::Utils::FunctionOfAnything>(
+            funct_id_mass_source - 1);
+  }
+
+  const int funct_id_eos = params_->funct_id_eos_;
+  if (funct_id_eos != 0)
+  {
+    equation_of_state_function_ =
+        &Global::Problem::instance()->function_by_id<Core::Utils::FunctionOfAnything>(
+            funct_id_eos - 1);
+  }
 }
 
 /*----------------------------------------------------------------------*
@@ -110,6 +131,7 @@ void Mat::StructPoroMasstransfer::pack(Core::Communication::PackBuffer& data) co
   add_to_pack(data, density_n_);
   add_to_pack(data, density_current_);
   add_to_pack(data, temperature_current_);
+  add_to_pack(data, phi1_current_);
   add_to_pack(data, rho_s_current_);
   add_to_pack(data, dtemperature_dt_);
   add_to_pack(data, masstransferRate_);
@@ -134,6 +156,7 @@ void Mat::StructPoroMasstransfer::unpack(Core::Communication::UnpackBuffer& buff
   extract_from_pack(buffer, density_n_);
   extract_from_pack(buffer, density_current_);
   extract_from_pack(buffer, temperature_current_);
+  extract_from_pack(buffer, phi1_current_);
   extract_from_pack(buffer, rho_s_current_);
   extract_from_pack(buffer, dtemperature_dt_);
   extract_from_pack(buffer, masstransferRate_);
@@ -162,14 +185,12 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     int gp, double& masstransferRate, double& masstransfer_dp, double& masstransfer_dphi,
     double& masstransfer_dJ, double& density_current, double& density_n, double& ddensity_dp,
     double& ddensity_dT, double& dddensity_dTdp, double& dtemperature_dt, bool save)
-{  // std::cout << "begin " << std::endl;
+{
   double temperature = 1.0;
   double rho_s;
   double rho_ss = 8520.0;
   double t_tot = params.get<double>("total time");
   // TODO: do not read from parameter list!
-
-  //  constant function
 
   // get scalardt
   if (params.isParameter("scalardt"))
@@ -192,10 +213,13 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     {
       temperature = scalars->at(2);
       rho_s = scalars->at(1);
-      // std::cout << "temperature " << temperature << std::endl;
       //  save value to use it later or when called without scalar available
       temperature_current_[gp] = temperature;
+      phi1_current_[gp] = scalars->at(0);
       rho_s_current_[gp] = rho_s;
+      //      std::cout << "rho_s_current_[gp] " << rho_s_current_[gp] << std::endl;
+      //      std::cout << "phi1_current_[gp] " << phi1_current_[gp] << std::endl;
+      //      std::cout << "temperature_current_[gp] " << temperature_current_[gp] << std::endl;
     }
   }
 
@@ -215,44 +239,40 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     {
       // std::cout << "temperature " << temperature << " rho_s " << rho_s << " press " << press
       // << std::endl;
+      std::vector<std::pair<std::string, double>> variables;
+      std::vector<std::pair<std::string, double>> constants;
+      variables.emplace_back("p", press);
+      constants.emplace_back("phi3", temperature_current_[gp]);  // T
+      constants.emplace_back("phi2", rho_s_current_[gp]);        // rho
+      constants.emplace_back("phi1", phi1_current_[gp]);         // T
+
       masstransferRate_[gp] =
-          -params_->rateConstant_ * 59.9 * exp(-21.17e03 / 8.314 / temperature_current_[gp]) *
-          (log(press) - 12.919 - log(1.0e05) + 3704.4 / temperature_current_[gp]) *
-          (rho_ss - rho_s_current_[gp]);
-      masstransfer_dp_[gp] = -params_->rateConstant_ * 59.9 *
-                             exp(-21.17e03 / 8.314 / temperature_current_[gp]) * (1 / press) *
-                             (rho_ss - rho_s_current_[gp]);
-      // std::cout << "passed " << std::endl;
+          -params_->rateConstant_ * masstransfer_function_->evaluate(variables, constants, 0);
+      std::vector<double> dp = masstransfer_function_->evaluate_derivative(variables, constants, 0);
+      masstransfer_dp_[gp] = -params_->rateConstant_ * dp[0];
+
+      //      test this
+
+      //      std::cout << "function masstransferRate_[gp] " << masstransferRate_[gp] << std::endl;
+      //      std::cout << "function masstransfer_dp_[gp] " << masstransfer_dp_[gp] << std::endl;
+      //
+      //      masstransferRate_[gp] =
+      //        -params_->rateConstant_ * 59.9 * exp(-21.17e03 / 8.314 / temperature_current_[gp])
+      //         * (log(press) - 12.919 - log(1.0e05) + 3704.4 / temperature_current_[gp]) *
+      //        (rho_ss - rho_s_current_[gp]);
+      //      masstransfer_dp_[gp] = -params_->rateConstant_ * 59.9 *
+      //        exp(-21.17e03 / 8.314 / temperature_current_[gp]) * (1 / press)
+      //         * (rho_ss - rho_s_current_[gp]);
+      //      std::cout << "hardcode masstransferRate_[gp] " << masstransferRate_[gp] << std::endl;
+      //      std::cout << "hardcode masstransfer_dp_[gp] " << masstransfer_dp_[gp] << std::endl;
     }
     dtemperature_dt = dtemperature_dt_[gp];
     masstransferRate = masstransferRate_[gp];
     masstransfer_dp = masstransfer_dp_[gp];
-    //    // This would be for weakly compressible
-    //    if (true)
-    //    {
-    //      double ref_press = 800000.0;
-    //      double MH_over_R = 2.01588e-03 / 8.314;
-    //      density_current = MH_over_R * ref_press / temperature_current_[gp];
-    //      ddensity_dp = 0.0;
-    //      ddensity_dT = -MH_over_R * ref_press / temperature_current_[gp] /
-    //      temperature_current_[gp];
-    //    }
-    //    // this would be ideal gas
-    //    else
-    //    {
-    //      double MH_over_R = 2.01588e-03 / 8.314;
-    //      density_current = MH_over_R * press / temperature_current_[gp];
-    //      ddensity_dp = MH_over_R / temperature_current_[gp];
-    //      ddensity_dT = -MH_over_R * press / temperature_current_[gp] / temperature_current_[gp];
-    //    }
-    // std::cout << "abc " << rho_s_current_[gp] << " " << temperature_current_[gp] << " " << press
-    //          << " " << std::endl;
   }
   else
     FOUR_C_THROW(
         "Type of function specified by functionID %d not implemented", params_->functionID_);
-  // std::cout << "end " << masstransferRate << std::endl;
-  // std::cout << "temperature_current_ adress " << &temperature_current_ << std::endl;
 
   if (params_->compressibleID_ == 0)
   {

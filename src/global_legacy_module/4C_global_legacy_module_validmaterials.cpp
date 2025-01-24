@@ -3233,6 +3233,13 @@ std::shared_ptr<std::vector<std::shared_ptr<Mat::MaterialDefinition>>> Global::v
     m->add_component(entry<double>("FACTORCOMP",
         {.description = "constant is used as factor in ideal gas or weakly compressible law",
             .default_value = 0.0}));
+    m->add_component(entry<int>("FUNCTIDMASSOURCE",
+        {.description =
+                "id of the function describing the mass source. Can depend on p and T and rho_s",
+            .default_value = 0}));
+    m->add_component(entry<int>("FUNCTIDCOMP",
+        {.description = "id of the function describing the compressible law. Can depend on p and T",
+            .default_value = 0}));
 
     Mat::append_material_definition(matlist, m);
   }
@@ -4745,6 +4752,10 @@ std::shared_ptr<std::vector<std::shared_ptr<Mat::MaterialDefinition>>> Global::v
         entry<double>("DENS", {.description = "material mass density", .default_value = 0.0}));
     m->add_component(
         entry<double>("EXPRATE", {.description = "expansion rate", .default_value = 0.0}));
+    m->add_component(entry<double>(
+        "rho_0", {.description = "value scalar at which expansion zero", .default_value = 0.0}));
+    m->add_component(entry<double>(
+        "rho_ss", {.description = "value scalar at which full expansion", .default_value = 1.0}));
 
     Mat::append_material_definition(matlist, m);
   }

@@ -13,6 +13,13 @@
 #include "4C_mat_structporo.hpp"
 
 FOUR_C_NAMESPACE_OPEN
+namespace Core
+{
+  namespace Utils
+  {
+    class FunctionOfAnything;
+  }
+}  // namespace Core
 
 namespace Mat
 {
@@ -52,6 +59,12 @@ namespace Mat
 
       /// the constant or linear factor determining the mass transfer rate depending on functionID_
       double rateConstant_;
+
+      /// function id of mass source. Needs to depend on p and T
+      double funct_id_mass_source_;
+
+      /// function id of compressible gas. Can depend on p and T
+      double funct_id_eos_;
       //@}
 
     };  // class StructPoroMasstransfer
@@ -205,10 +218,14 @@ namespace Mat
     std::vector<double> density_current_;
     /// temperature at the current time step
     std::vector<double> temperature_current_;
+    /// phi1 at the current time step
+    std::vector<double> phi1_current_;
     /// solid density at the current time step
     std::vector<double> rho_s_current_;
     /// time derivative of temperature at the current time step
     std::vector<double> dtemperature_dt_;
+    const Core::Utils::FunctionOfAnything* masstransfer_function_{nullptr};
+    const Core::Utils::FunctionOfAnything* equation_of_state_function_{nullptr};
   };
 
 }  // namespace Mat

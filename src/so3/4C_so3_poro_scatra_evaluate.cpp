@@ -53,7 +53,7 @@ void Discret::Elements::So3PoroScatra<So3Ele, distype>::pre_evaluate(Teuchos::Pa
       for (int i = 0; i < numnod_; i++)
         for (int j = 0; j < numscal; j++) scalar->at(j) += myscalar[numscal * i + j] / numnod_;
 
-      params.set("scalar", scalar);
+      params.set("scalarNodal", myscalar);
 
       std::shared_ptr<const Core::LinAlg::Vector<double>> scalardtnp =
           discretization.get_state(2, "scalardtnp");

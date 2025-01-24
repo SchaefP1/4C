@@ -56,6 +56,11 @@ namespace Mat
       /// expansion rate
       const double exp_rate_;
 
+      /// rho at zero expansion
+      const double rho_0_;
+
+      /// rho at full expansion
+      const double rho_ss_;
       //@}
 
       /// create material instance of matching type with my parameters
