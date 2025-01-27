@@ -9,6 +9,7 @@
 
 #include "4C_comm_pack_helpers.hpp"
 #include "4C_global_data.hpp"
+#include "4C_mat_my_expansion_test.hpp"
 #include "4C_mat_par_bundle.hpp"
 
 #include <vector>
@@ -61,7 +62,13 @@ void Mat::StructPoroMasstransfer::poro_setup(
     int numgp, const Core::IO::InputParameterContainer& container)
 {
   StructPoro::poro_setup(numgp, container);
+  exp_rate_.resize(numgp);
+  std::fill(exp_rate_.begin(), exp_rate_.end(), 0.0);  // TODO see if there are better ways
 }
+
+/*----------------------------------------------------------------------*
+ *----------------------------------------------------------------------*/
+void Mat::StructPoroMasstransfer::update() { mat_->update(); }
 
 /*----------------------------------------------------------------------*/
 /*----------------------------------------------------------------------*/
@@ -73,7 +80,7 @@ void Mat::StructPoroMasstransfer::pack(Core::Communication::PackBuffer& data) co
 
   // matid
   int matid = -1;
-  if (params_ != NULL) matid = params_->id();  // in case we are in post-process mode
+  if (params_ != nullptr) matid = params_->id();  // in case we are in post-process mode
   add_to_pack(data, matid);
 
   // add base class material
@@ -89,7 +96,7 @@ void Mat::StructPoroMasstransfer::unpack(Core::Communication::UnpackBuffer& buff
   // matid
   int matid;
   extract_from_pack(buffer, matid);
-  params_ = NULL;
+  params_ = nullptr;
   if (Global::Problem::instance()->materials() != nullptr)
     if (Global::Problem::instance()->materials()->num() != 0)
     {
@@ -113,22 +120,32 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     int gp, double& masstransferRate, double& masstransfer_dp, double& masstransfer_dphi,
     double& masstransfer_dJ, bool save)
 {
+  double temperature = 0.0;
+  // TODO: do not read from parameter list!
+  if (params.isParameter("scalar"))
+  {
+    Teuchos::RCP<std::vector<double>> scalars =
+        params.get<Teuchos::RCP<std::vector<double>>>("scalar");
+    temperature = scalars->at(0);
+  }
+  std::cout << "Temp is: " << temperature << std::endl;
   // constant function
   if (params_->functionID_ == 0)
   {
-    masstransferRate = params_->rateConstant_;
+    masstransferRate = params_->rateConstant_ * temperature;
     masstransfer_dp = 0.0;
     // TODO need something to test a_dus that needs to be set here
   }
   else if (params_->functionID_ == 1)
   {
-    masstransferRate = params_->rateConstant_ * press;
-    masstransfer_dp = params_->rateConstant_;
+    masstransferRate = params_->rateConstant_ * press * temperature;
+    masstransfer_dp = params_->rateConstant_ * temperature;
   }
   else
     FOUR_C_THROW(
         "Type of function specified by functionID %d not implemented", params_->functionID_);
 
+  exp_rate_[gp] = masstransferRate;  // TODO see if this works well, possibly move into save?
   if (save)
   {
     (void)gp;

@@ -122,6 +122,7 @@ namespace Core::Materials
     m_muscle_giantesio,                         ///< Giantesio active strain muscle material
     m_muscle_weickenmeier,    ///< Weickenmeier generalized active strain muscle material
     m_myocard,                ///< anisotropic electrophysical model of heart tissue
+    m_my_expansion_test,      ///< my expansion test material
     m_newman,                 ///< properties of an ion species in an electrolyte solution
     m_newman_multiscale,      ///< properties of an ion species in an electrolyte solution for
                               ///< multi-scale approach

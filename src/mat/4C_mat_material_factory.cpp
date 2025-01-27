@@ -104,6 +104,7 @@
 #include "4C_mat_muscle_combo.hpp"
 #include "4C_mat_muscle_giantesio.hpp"
 #include "4C_mat_muscle_weickenmeier.hpp"
+#include "4C_mat_my_expansion_test.hpp"
 #include "4C_mat_myocard.hpp"
 #include "4C_mat_newman.hpp"
 #include "4C_mat_newman_multiscale.hpp"
@@ -351,6 +352,10 @@ std::unique_ptr<Core::Mat::PAR::Parameter> Mat::make_parameter(
     case Core::Materials::m_myocard:
     {
       return make_parameter_impl<Mat::PAR::Myocard>(id, type, input_data);
+    }
+    case Core::Materials::m_my_expansion_test:
+    {
+      return make_parameter_impl<Mat::PAR::MyExpansionTest_ElastHyper>(id, type, input_data);
     }
     case Core::Materials::m_sutherland:
     {

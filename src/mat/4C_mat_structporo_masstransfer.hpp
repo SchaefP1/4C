@@ -33,7 +33,7 @@ namespace Mat
       virtual ~StructPoroMasstransfer() { ; }
 
       /// create material instance of matching type with my parameters
-      virtual std::shared_ptr<Core::Mat::Material> create_material();
+      std::shared_ptr<Core::Mat::Material> create_material() override;
 
       /// @name material parameters
       //@{
@@ -146,6 +146,8 @@ namespace Mat
     void poro_setup(int numgp,  ///< number of Gauss points
         const Core::IO::InputParameterContainer& container);
 
+    void update() override;
+
     /// Return quick accessible material parameter data
     Core::Mat::PAR::Parameter* parameter() const override { return params_; }
 
@@ -174,6 +176,9 @@ namespace Mat
    protected:
     /// my material parameters
     Mat::PAR::StructPoroMasstransfer* params_;
+
+    /// current expansion rate at each gp
+    std::vector<double> exp_rate_;
   };
 
 }  // namespace Mat

@@ -4695,6 +4695,27 @@ std::shared_ptr<std::vector<std::shared_ptr<Mat::MaterialDefinition>>> Global::v
     Mat::append_material_definition(matlist, m);
   }
 
+  /*----------------------------------------------------------------------*/
+  // my expansion test
+  {
+    auto m = std::make_shared<Mat::MaterialDefinition>("MAT_my_expansion_test",
+        "test material for expansion for MH", Core::Materials::m_my_expansion_test);
+
+    m->add_component(entry<int>(
+        "NUMMATEL3D", {.description = "number of 3d elastin matrix materials/potentials in list",
+                          .default_value = 0}));
+    m->add_component(entry<std::vector<int>>(
+        "MATIDSEL3D", {.description = "the list 3d elastin matrix material/potential IDs",
+                          .default_value = std::vector{-1},
+                          .size = from_parameter<int>("NUMMATEL3D")}));
+    m->add_component(
+        entry<double>("DENS", {.description = "material mass density", .default_value = 0.0}));
+    m->add_component(
+        entry<double>("EXPRATE", {.description = "expansion rate", .default_value = 0.0}));
+
+    Mat::append_material_definition(matlist, m);
+  }
+
   // deliver
   return vm;
 }
