@@ -981,9 +981,13 @@ void Discret::Elements::So3Poro<So3Ele, distype>::gauss_point_loop_od(
     double da_dJ = 0.0;  // unused
     if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
     {
+      // fill those for now but not use them yet, not sure if even needed for solid
+      double density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt;
       std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
           std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
-      masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ);
+      // std::cout << "Next call ComputeMasstransfer from Solid OD" << std::endl;
+      masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ,
+          density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt);
     }
 
     // **********************evaluate stiffness matrix and force vector+++++++++++++++++++++++++
@@ -1957,9 +1961,13 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
 
     if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
     {
+      // fill those for now but not use them yet, not sure if even needed for solid
+      double density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt;
       std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
           std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
-      masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ);
+      // std::cout << "Next call ComputeMasstransfer from Solid not OD" << std::endl;
+      masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ,
+          density_current, density_n, ddensity_dp, ddensity_dT, dddensity_dTdp, dtemperature_dt);
     }
 
     for (int idim = 0; idim < numdim_; idim++)

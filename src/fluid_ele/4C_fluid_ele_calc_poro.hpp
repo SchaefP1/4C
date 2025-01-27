@@ -1124,6 +1124,13 @@ namespace Discret
       double da_dp_;
       double da_dphi_;
       double da_dJ_;
+
+      double ddensity_dp_ = 0.0;
+      double ddensity_dT_;
+      double dddensity_dT_dp_;
+      double dddensity_dp_dp_ = 0.0;  // still need to set somewhere
+      double dtemperature_dt_;
+      double temperature_;
       Core::LinAlg::Matrix<nsd_, nsd_ * nen_> da_dus_vcon_;
     };
   }  // namespace Elements

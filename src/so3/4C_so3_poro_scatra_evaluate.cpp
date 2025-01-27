@@ -54,6 +54,21 @@ void Discret::Elements::So3PoroScatra<So3Ele, distype>::pre_evaluate(Teuchos::Pa
         for (int j = 0; j < numscal; j++) scalar->at(j) += myscalar[numscal * i + j] / numnod_;
 
       params.set("scalar", scalar);
+
+      std::shared_ptr<const Core::LinAlg::Vector<double>> scalardtnp =
+          discretization.get_state(2, "scalardtnp");
+
+      // extract local values of the global vectors
+      std::vector<double> myscalardt(la[2].lm_.size());
+      Core::FE::extract_my_values(*scalardtnp, myscalardt, la[2].lm_);
+
+      std::shared_ptr<std::vector<double>> scalardt =
+          std::make_shared<std::vector<double>>(numscal, 0.0);
+
+      for (int i = 0; i < numnod_; i++)
+        for (int j = 0; j < numscal; j++) scalardt->at(j) += myscalardt[numscal * i + j] / numnod_;
+
+      params.set("scalardt", scalardt);
     }
   }
   else

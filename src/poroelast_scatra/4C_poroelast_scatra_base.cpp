@@ -147,7 +147,9 @@ void PoroElastScaTra::PoroScatraBase::set_scatra_solution()
   // porous structure
   poro_->structure_field()->discretization()->set_state(2, "scalar", phinp_s);
   poro_->structure_field()->discretization()->set_state(2, "scalarn", phin_s);
+  poro_->structure_field()->discretization()->set_state(2, "scalardtnp", phidtnp);
 
+  // poro_->fluid_field()->discretization()->set_state(2, "scalardtnp", phidtnp);
   // porous fluid
   poro_->fluid_field()->set_iter_scalar_fields(phinp_f, phin_f, phidtnp,
       // scatra_->ScaTraField()->discretization()

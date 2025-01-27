@@ -428,7 +428,9 @@ int Discret::Elements::FluidEleCalcPoro<distype>::evaluate_od(Discret::Elements:
       discretization, lm, *Base::rotsymmpbc_, nullptr, &epressnp_timederiv, "accnp");
 
   static Core::LinAlg::Matrix<nen_, 1> escaaf(true);
-  epressnp_timederiv.clear();
+
+  epressnp_timederiv
+      .clear();  // TODO this seems to be a bug? Or might be unneeded? either way seems wrong?
   Base::extract_values_from_global_vector(
       discretization, lm, *Base::rotsymmpbc_, nullptr, &escaaf, "scaaf");
 
@@ -835,10 +837,18 @@ void Discret::Elements::FluidEleCalcPoro<distype>::evaluate_pressure_equation(
     }
     else  // one step theta
     {
+      // std::cout << "dynamics preforce new: " <<Base::fac_ << " " <<
+      //                                              press_ << " " << porosity_ << " " <<
+      //                                              Base::densaf_ << " " << ddensity_dp_
+      //                                               << std::endl;
+      // Compressible:
       for (int vi = 0; vi < nen_; ++vi)
-        preforce(vi) -= Base::fac_ * (press_ * dphi_dp) * Base::funct_(vi);
+        preforce(vi) -= Base::fac_ *
+                        (press_ * (dphi_dp + porosity_ / Base::densaf_ * ddensity_dp_)) *
+                        Base::funct_(vi);
 
-      const double rhsfac_rhscon = rhsfac * dphi_dp * Base::rhscon_;
+      const double rhsfac_rhscon =
+          rhsfac * (dphi_dp + porosity_ / Base::densaf_ * ddensity_dp_) * Base::rhscon_;
       for (int vi = 0; vi < nen_; ++vi)
       {
         /* additional rhs term of continuity equation */
@@ -849,10 +859,18 @@ void Discret::Elements::FluidEleCalcPoro<distype>::evaluate_pressure_equation(
     for (int vi = 0; vi < nen_; ++vi)
       preforce(vi) -= rhsfac * Base::funct_(vi) * dphi_dJ * J_ * gridvel_div_;
 
+    double dddensity_dpdp = 0.0;  // TODO: zero for now as ideal gas but read from material later
+
     // additional left hand side term as history values are multiplied by dphi_dp^(n+1)
     for (int vi = 0; vi < nen_; ++vi)
     {
-      const double factor = timefacfacpre * Base::funct_(vi) * Base::rhscon_ * dphi_dpp;
+      // std::cout << "this should not show" << std::endl;
+      //  Compressible:
+      const double factor =
+          timefacfacpre * Base::funct_(vi) * Base::rhscon_ *
+          (dphi_dpp + dphi_dp / Base::densaf_ * ddensity_dp_ -
+              porosity_ * ddensity_dp_ / Base::densaf_ / Base::densaf_ * ddensity_dp_ +
+              porosity_ / Base::densaf_ * dddensity_dpdp);
       for (int ui = 0; ui < nen_; ++ui)
       {
         ppmat(vi, ui) -= factor * Base::funct_(ui);
@@ -947,6 +965,94 @@ void Discret::Elements::FluidEleCalcPoro<distype>::evaluate_pressure_equation_no
       for (int ui = 0; ui < nen_; ++ui)
       {
         ppmat(vi, ui) += v * (dphi_dp * Base::vdiv_ * Base::funct_(ui) + dgradphi_dp_velint(ui));
+      }
+    }
+
+    // Compressible: (maybe move away from conti not partial integration)
+    // std::cout << "part1: " << rhsfac << " " << porosity_ << " " << Base::densaf_ << " " <<
+    //    ddensity_dT_ << " " << dtemperature_dt_ << std::endl;
+    // Term 2
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      preforce(vi) -=
+          rhsfac * porosity_ / Base::densaf_ * ddensity_dT_ * dtemperature_dt_ * Base::funct_(vi);
+    }
+
+    // Compressible:
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double v = timefacfacpre * Base::funct_(vi);  // TODO check factor
+
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ppmat(vi, ui) += ((dphi_dp - porosity_ * ddensity_dp_ / Base::densaf_) * ddensity_dT_ +
+                             porosity_ * dddensity_dT_dp_) *
+                         dtemperature_dt_ / Base::densaf_ * v * Base::funct_(ui);
+      }
+    }
+
+    // Compressible: (this is not partial integration)
+    // Term 3
+    double grad_density_convel = 0.0;
+    for (int j = 0; j < nsd_; j++)
+      grad_density_convel +=
+          (ddensity_dp_ * Base::gradp_(j) + ddensity_dT_ * Base::grad_scaaf_(j)) * convvel_(j);
+    for (int vi = 0; vi < nen_; ++vi)
+    {  // std::cout << "this should be 0 part 2: " << rhsfac * grad_density_convel * porosity_
+       // /Base::densaf_ << std::endl;
+      preforce(vi) -= rhsfac * grad_density_convel * porosity_ / Base::densaf_ * Base::funct_(vi);
+    }
+
+    //    double dgrad_density_convel_dp = 0.0;
+    //    for (int j = 0; j < nsd_; j++) dgrad_density_convel_dp += (dddensity_dp_dp_ *
+    //    Base::gradp_(j)
+    //                                                              + dddensity_dT_dp_ *
+    //                                                              Base::grad_scaaf_(j))
+    //                                                          * convvel_(j);
+
+    Core::LinAlg::Matrix<nsd_, nen_> dgraddensity_dp;
+    //--linearization of density w.r.t. pressure at gausspoint
+    // d(grad(rho))/dp = d^2rho/(dTdp)* dT/dx + d^2rho/(dp)^2 * dp/dx + drho/dp* N,x
+    dgraddensity_dp.multiply_nt(dddensity_dT_dp_, Base::grad_scaaf_, Base::funct_);
+    dgraddensity_dp.multiply_nt(dddensity_dp_dp_, Base::gradp_, Base::funct_, 1.0);
+    dgraddensity_dp.update(ddensity_dp_, Base::derxy_, 1.0);
+
+    static Core::LinAlg::Matrix<1, nen_> dgradrho_dp_convvel;
+    dgradrho_dp_convvel.multiply_tn(convvel_, dgraddensity_dp);
+
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double v = timefacfacpre * Base::funct_(vi);  // TODO check factor
+
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        // this is the part due to porosity_ /Base::densaf_
+        ppmat(vi, ui) += (dphi_dp - porosity_ * ddensity_dp_ / Base::densaf_) *
+                         grad_density_convel / Base::densaf_ * v * Base::funct_(ui);
+        ppmat(vi, ui) += dgradrho_dp_convvel(ui) * v * porosity_ / Base::densaf_;
+        // this is the part due to grad rho
+        //        // this is the part from grad_density_convel except for the grad_p
+        //        ppmat(vi, ui) += porosity_ / Base::densaf_ * dgrad_density_convel_dp * v *
+        //        Base::funct_(ui); for (int idim = 0; idim < nsd_; ++idim)
+        //          ppmat(vi, ui) += ddensity_dp_ * porosity_ /Base::densaf_ * Base::derxy_(idim,
+        //          vi) * convvel_(idim);
+      }
+    }
+
+    for (int idim = 0; idim < nsd_; ++idim)
+    {
+      const double grad_rho_idim =
+          porosity_ / Base::densaf_ *
+          (ddensity_dp_ * Base::gradp_(idim) + ddensity_dT_ * Base::grad_scaaf_(idim));
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        const int fui = nsd_ * ui;
+        const double funct_ui = Base::funct_(ui);
+
+        for (int vi = 0; vi < nen_; ++vi)
+        {  // check if factor makes sense
+          estif_q_u(vi, fui + idim) += timefacfacpre * Base::funct_(vi) * grad_rho_idim * funct_ui;
+        }
       }
     }
 
@@ -1551,9 +1657,6 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
     // TODO I could move this now into EvaluatePressureEquation and should do so once it works
     if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
     {
-      std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
-          std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
-
       for (int vi = 0; vi < Base::nen_; ++vi)
       {  // check if rhsfac or timefacfacpre makes more sense
         preforce(vi) += rhsfac * a_ / Base::densaf_ * Base::funct_(vi);
@@ -1567,6 +1670,23 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
           ppmat(vi, ui) += factor * Base::funct_(ui);
         }
       }
+
+      // the dT/dt term
+      //      for (int vi = 0; vi < Base::nen_; ++vi)
+      //      {  // check if rhsfac or some other makes more sense
+      //        preforce(vi) += rhsfac * porosity_ / Base::densaf_ * ddensity_dT_ *
+      //        Base::fldparatimint_->Theta() * (temperature_ - temperature_n_) /
+      //        fldparatimint_->Dt() * Base::funct_(vi);
+      //      }
+      //
+      //      for (int vi = 0; vi < Base::nen_; ++vi)
+      //      {
+      //        const double factor = -rhsfac * da_dp_ / Base::densaf_ * Base::funct_(vi);
+      //        for (int ui = 0; ui < Base::nen_; ++ui)
+      //        {
+      //          ppmat(vi, ui) += factor * Base::funct_(ui);
+      //        }
+      //      }
     }
 
     // 5) standard Galerkin bodyforce term on right-hand side
@@ -5390,12 +5510,27 @@ void Discret::Elements::FluidEleCalcPoro<distype>::ComputeMassSourceTerms(
       std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
 
   // TODO remove this once it works and replace by a_ etc directly
-  double reactionrate, reactionrate_derivi, da_dphi, da_dJ;
+  double reactionrate = 0.0;
+  double reactionrate_derivi = 0.0;
+  double da_dphi = 0.0;
+  double da_dJ = 0.0;
+  // fill those for now but not use them yet
+  double density_current = 0.0;
+  double density_n = 0.0;
 
-  masstransfer_mat->ComputeMasstransfer(
-      params, press_, gp, reactionrate, reactionrate_derivi, da_dphi, da_dJ);
+  masstransfer_mat->ComputeMasstransfer(params, press_, gp, reactionrate, reactionrate_derivi,
+      da_dphi, da_dJ, density_current, density_n, ddensity_dp_, ddensity_dT_, dddensity_dT_dp_,
+      dtemperature_dt_);
 
   fluid_mom_source_.update(reactionrate / porosity_, convvel_);
+
+  if (density_current > 0.000001)
+  {  // std::cout << "Density is " << density_current << std::endl;
+    // not sure if this will work for gen alpha
+    Base::densaf_ = density_current;
+    Base::densam_ = density_current;
+    Base::densn_ = density_n;
+  }
 
   a_ = reactionrate;
   da_dp_ = reactionrate_derivi;
@@ -6187,6 +6322,8 @@ void Discret::Elements::FluidEleCalcPoro<distype>::evaluate_variables_at_gauss_p
     Base::gradp_.multiply(Base::derxy_, eprenp);
   else
     Base::gradp_.multiply(Base::derxy_, epreaf);
+
+  Base::grad_scaaf_.multiply(Base::derxy_, escaaf);
 
   // fluid pressure at gradient w.r.t to reference coordinates at gauss point
   refgrad_press_.multiply(Base::deriv_, epreaf);

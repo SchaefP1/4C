@@ -159,6 +159,13 @@ namespace Mat
         double& masstransfer_dp,    //!< (o) derivative of masstransfer wrt pressure
         double& masstransfer_dphi,  //!< (o) derivative of masstransfer wrt porosity
         double& masstransfer_dJ,    //!< (o) derivative of masstransfer wrt jacobian
+        double& density_current,    //!< (o) density at current time step
+        double& density_n,          //!< (o) density at last time step
+        double& ddensity_dp,        //!< (o) derivative of density at current time step wrt pressure
+        double& ddensity_dT,     //!< (o) derivative of density at current time step wrt temperature
+        double& dddensity_dTdp,  //!< (o) derivative of density at current time step wrt temperature
+                                 //!< and pressure
+        double& dtemperature_dt,  //!< (o) time derivative of temperature at the current time step
         bool save = true);
 
     //@}
@@ -178,11 +185,21 @@ namespace Mat
     Mat::PAR::StructPoroMasstransfer* params_;
 
     /// current expansion rate at each gp
-    std::vector<double> exp_rate_;
-    /// current expansion rate at each gp
     std::vector<double> masstransferRate_;
     /// current expansion rate at each gp
     std::vector<double> masstransfer_dp_;
+    /// flag if density is set
+    std::vector<bool> density_set_flag;
+    /// density at the last time step
+    std::vector<double> density_n_;
+    /// density at the current time step
+    std::vector<double> density_current_;
+    /// temperature at the current time step
+    std::vector<double> temperature_current_;
+    /// solid density at the current time step
+    std::vector<double> rho_s_current_;
+    /// time derivative of temperature at the current time step
+    std::vector<double> dtemperature_dt_;
   };
 
 }  // namespace Mat

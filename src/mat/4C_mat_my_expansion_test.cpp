@@ -201,12 +201,19 @@ void Mat::MyExpansionTest_ElastHyper::evaluate(const Core::LinAlg::Matrix<3, 3>*
   {
     std::shared_ptr<std::vector<double>> scalars =
         params.get<std::shared_ptr<std::vector<double>>>("scalar");
-    temperature = scalars->at(1);
-    rho_s = scalars->at(2);
+    try
+    {
+      temperature = scalars->at(2);
+      rho_s = scalars->at(1);
+    }
+    catch (const std::out_of_range& e)
+    {
+      FOUR_C_THROW("Not enough scalars to use my expansion test material");
+    }
   }
   scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
                    (1.0 + alpha_reaction * (rho_s - rho_s0) / (rho_ss - rho_s0));
-  // std::cout << "scaling_factor " << scaling_factor << std::endl;
+
   //  set-up inverse expansion tensor
   Core::LinAlg::Matrix<3, 3> iFexpM(true);
   for (int i = 0; i < 3; ++i) iFexpM(i, i) = 1.0;
