@@ -163,7 +163,6 @@ int Discret::Elements::ScaTraEleCalc<distype, probdim>::evaluate(Core::Elements:
   //--------------------------------------------------------------------------------
   // extract element based or nodal values
   //--------------------------------------------------------------------------------
-
   extract_element_and_node_values(ele, params, discretization, la);
 
   //--------------------------------------------------------------------------------

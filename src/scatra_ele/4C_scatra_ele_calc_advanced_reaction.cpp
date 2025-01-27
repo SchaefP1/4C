@@ -328,11 +328,24 @@ void Discret::Elements::ScaTraEleCalcAdvReac<distype, probdim>::set_advanced_rea
 {
   const std::shared_ptr<ScaTraEleReaManagerAdvReac> remanager = rea_manager();
 
-  remanager->add_to_rea_body_force(
-      matreaclist->calc_rea_body_force_term(k, my::scatravarmanager_->phinp(), gpcoord), k);
+  // so this is where I need to find a way to add pressure and possibly porosity to constants and
+  // use the other over load of the function pressure should exist in eprenp_ (possibibly even
+  // always for poro), the poro version has porosity (if it's a dof) but would probably need a hack
+  // to access it here
+  const double pres = my::eprenp_.dot(my::funct_);
 
-  matreaclist->calc_rea_body_force_deriv_matrix(
-      k, remanager->get_rea_body_force_deriv_vector(k), my::scatravarmanager_->phinp(), gpcoord);
+  //! a vector containing all quantities, the equation is coupled with
+  //! (i.e. pressures and porosity)
+  std::vector<std::pair<std::string, double>> couplingvalues_;
+  couplingvalues_.push_back(std::pair<std::string, double>("p", pres));
+
+  // std::cout << "Trail mnd 6c: " << std::endl;
+  remanager->add_to_rea_body_force(matreaclist->calc_rea_body_force_term(
+                                       k, my::scatravarmanager_->phinp(), couplingvalues_, gpcoord),
+      k);
+
+  matreaclist->calc_rea_body_force_deriv_matrix(k, remanager->get_rea_body_force_deriv_vector(k),
+      my::scatravarmanager_->phinp(), couplingvalues_, gpcoord);
 }
 
 /*----------------------------------------------------------------------*
