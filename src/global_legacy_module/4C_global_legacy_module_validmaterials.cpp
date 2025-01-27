@@ -3200,6 +3200,15 @@ std::shared_ptr<std::vector<std::shared_ptr<Mat::MaterialDefinition>>> Global::v
     m->add_component(
         entry<double>("RATECONSTANT", {.description = "constant that determines constant rate/the "
                                                       "linear factor for linear in pressure"}));
+    m->add_component(
+        entry<int>("COMPRESSIBLEID", {.description = "Id of compressibility: 0: incompressible, 1: "
+                                                     "weakly compressible ideal gas 2: ideal gas",
+                                         .default_value = 0}));
+    m->add_component(entry<double>("STARTTIME",
+        {.description = "time when reaction starts, only for FUNCTIONID 2", .default_value = 0.0}));
+    m->add_component(entry<double>("FACTORCOMP",
+        {.description = "constant is used as factor in ideal gas or weakly compressible law",
+            .default_value = 0.0}));
 
     Mat::append_material_definition(matlist, m);
   }

@@ -22,6 +22,9 @@ Mat::PAR::StructPoroMasstransfer::StructPoroMasstransfer(
     const Core::Mat::PAR::Parameter::Data& matdata)
     : StructPoro(matdata),
       functionID_(matdata.parameters.get<int>("FUNCTIONID")),
+      compressibleID_(matdata.parameters.get<int>("COMPRESSIBLEID")),
+      factor_comp_(matdata.parameters.get<double>("FACTORCOMP")),
+      reaction_start_time_(matdata.parameters.get<double>("STARTTIME")),
       rateConstant_(matdata.parameters.get<double>("RATECONSTANT"))
 {
 }
@@ -101,6 +104,16 @@ void Mat::StructPoroMasstransfer::pack(Core::Communication::PackBuffer& data) co
   if (params_ != nullptr) matid = params_->id();  // in case we are in post-process mode
   add_to_pack(data, matid);
 
+  add_to_pack(data, masstransferRate_);
+  add_to_pack(data, masstransfer_dp_);
+  add_to_pack(data, density_set_flag);
+  add_to_pack(data, density_n_);
+  add_to_pack(data, density_current_);
+  add_to_pack(data, temperature_current_);
+  add_to_pack(data, rho_s_current_);
+  add_to_pack(data, dtemperature_dt_);
+  add_to_pack(data, masstransferRate_);
+
   // add base class material
   StructPoro::pack(data);
 }
@@ -114,6 +127,17 @@ void Mat::StructPoroMasstransfer::unpack(Core::Communication::UnpackBuffer& buff
   // matid
   int matid;
   extract_from_pack(buffer, matid);
+
+  extract_from_pack(buffer, masstransferRate_);
+  extract_from_pack(buffer, masstransfer_dp_);
+  extract_from_pack(buffer, density_set_flag);
+  extract_from_pack(buffer, density_n_);
+  extract_from_pack(buffer, density_current_);
+  extract_from_pack(buffer, temperature_current_);
+  extract_from_pack(buffer, rho_s_current_);
+  extract_from_pack(buffer, dtemperature_dt_);
+  extract_from_pack(buffer, masstransferRate_);
+
   params_ = nullptr;
   if (Global::Problem::instance()->materials() != nullptr)
     if (Global::Problem::instance()->materials()->num() != 0)
@@ -147,6 +171,7 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
 
   //  constant function
 
+  // get scalardt
   if (params.isParameter("scalardt"))
   {
     std::shared_ptr<std::vector<double>> scalardt =
@@ -154,6 +179,7 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     dtemperature_dt_[gp] = scalardt->at(2);
   }
 
+  // get scalars
   if (params.isParameter("scalar"))
   {
     std::shared_ptr<std::vector<double>> scalars =
@@ -166,7 +192,7 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     {
       temperature = scalars->at(2);
       rho_s = scalars->at(1);
-
+      std::cout << "temperature " << temperature << std::endl;
       // save value to use it later or when called without scalar available
       temperature_current_[gp] = temperature;
       rho_s_current_[gp] = rho_s;
@@ -185,86 +211,83 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
   }
   else if (params_->functionID_ == 2)
   {
-    if (t_tot >= 0.1)
+    if (t_tot >= params_->reaction_start_time_)
     {
       // std::cout << "temperature " << temperature << " rho_s " << rho_s << " press " << press
       // << std::endl;
       masstransferRate_[gp] =
-          -59.9 * exp(-21.17e03 / 8.314 / temperature_current_[gp]) *
+          -params_->rateConstant_ * 59.9 * exp(-21.17e03 / 8.314 / temperature_current_[gp]) *
           (log(press) - 12.919 - log(1.0e05) + 3704.4 / temperature_current_[gp]) *
           (rho_ss - rho_s_current_[gp]);
-      masstransfer_dp_[gp] = -59.9 * exp(-21.17e03 / 8.314 / temperature_current_[gp]) *
-                             (1 / press) * (rho_ss - rho_s_current_[gp]);
+      masstransfer_dp_[gp] = -params_->rateConstant_ * 59.9 *
+                             exp(-21.17e03 / 8.314 / temperature_current_[gp]) * (1 / press) *
+                             (rho_ss - rho_s_current_[gp]);
       // std::cout << "passed " << std::endl;
     }
-
-    // This would be for weakly compressible
-    if (true)
-    {
-      double ref_press = 800000.0;
-      double MH_over_R = 2.01588e-03 / 8.314;
-      density_current = MH_over_R * ref_press / temperature_current_[gp];
-      ddensity_dp = 0.0;
-      ddensity_dT = -MH_over_R * ref_press / temperature_current_[gp] / temperature_current_[gp];
-    }
-    // this would be ideal gas
-    else
-    {
-      double MH_over_R = 2.01588e-03 / 8.314;
-      density_current = MH_over_R * press / temperature_current_[gp];
-      ddensity_dp = MH_over_R / temperature_current_[gp];
-      ddensity_dT = -MH_over_R * press / temperature_current_[gp] / temperature_current_[gp];
-    }
-    density_current_[gp] = density_current;
-    if (!density_set_flag[gp])
-    {
-      density_n_[gp] = density_current;
-      density_set_flag[gp] = true;
-    }
-    density_n = density_n_[gp];
-
     dtemperature_dt = dtemperature_dt_[gp];
     masstransferRate = masstransferRate_[gp];
     masstransfer_dp = masstransfer_dp_[gp];
-  }
-  else if (params_->functionID_ == 3 || params_->functionID_ == 4)
-  {  // like functionID 0 (constant reaction) just comp
-    masstransferRate = params_->rateConstant_;
-    masstransfer_dp = 0.0;
-    dtemperature_dt = dtemperature_dt_[gp];
-    if (params_->functionID_ == 3)
-    {
-      double ref_press = 1.0;
-      double MH_over_R = 1.0;
-      density_current = MH_over_R * ref_press / temperature_current_[gp];
-      ddensity_dp = 0.0;
-      ddensity_dT = -MH_over_R * ref_press / temperature_current_[gp] / temperature_current_[gp];
-      dddensity_dTdp = 0.0;
-    }
-    // this would be ideal gas
-    if (params_->functionID_ == 4)
-    {
-      double MH_over_R = 1.0;
-      density_current = MH_over_R * press / temperature_current_[gp];
-      ddensity_dp = MH_over_R / temperature_current_[gp];
-      ddensity_dT = -MH_over_R * press / temperature_current_[gp] / temperature_current_[gp];
-      dddensity_dTdp = -MH_over_R / temperature_current_[gp] / temperature_current_[gp];
-    }
-    density_current_[gp] = density_current;
-    // if the was no previous step so the density there hasn't been set so use current one
-    if (!density_set_flag[gp])
-    {
-      density_n_[gp] = density_current;
-      density_set_flag[gp] = true;
-    }
-    density_n = density_n_[gp];
+    //    // This would be for weakly compressible
+    //    if (true)
+    //    {
+    //      double ref_press = 800000.0;
+    //      double MH_over_R = 2.01588e-03 / 8.314;
+    //      density_current = MH_over_R * ref_press / temperature_current_[gp];
+    //      ddensity_dp = 0.0;
+    //      ddensity_dT = -MH_over_R * ref_press / temperature_current_[gp] /
+    //      temperature_current_[gp];
+    //    }
+    //    // this would be ideal gas
+    //    else
+    //    {
+    //      double MH_over_R = 2.01588e-03 / 8.314;
+    //      density_current = MH_over_R * press / temperature_current_[gp];
+    //      ddensity_dp = MH_over_R / temperature_current_[gp];
+    //      ddensity_dT = -MH_over_R * press / temperature_current_[gp] / temperature_current_[gp];
+    //    }
+    std::cout << "abc " << rho_s_current_[gp] << " " << temperature_current_[gp] << " " << press
+              << " " << std::endl;
   }
   else
     FOUR_C_THROW(
         "Type of function specified by functionID %d not implemented", params_->functionID_);
-  // std::cout << "end " << std::endl;
-  // std::cout << "temperature_current_ " << std::setprecision(10) << temperature_current_[gp] <<
-  // std::endl;
+  std::cout << "end " << masstransferRate << std::endl;
+  std::cout << "temperature_current_ address " << &temperature_current_ << std::endl;
+
+  if (params_->compressibleID_ == 0)
+  {
+    // incomp. Set everything to 0.0 which leads to it being ignored
+    density_current = 0.0;
+    ddensity_dp = 0.0;
+    ddensity_dT = 0.0;
+    dddensity_dTdp = 0.0;
+  }
+  else if (params_->compressibleID_ == 1)
+  {
+    double ref_press = 1.0;
+    double MH_over_R = params_->factor_comp_;
+    density_current = MH_over_R * ref_press / temperature_current_[gp];
+    ddensity_dp = 0.0;
+    ddensity_dT = -MH_over_R * ref_press / temperature_current_[gp] / temperature_current_[gp];
+    dddensity_dTdp = 0.0;
+  }
+  // this would be ideal gas
+  else if (params_->compressibleID_ == 2)
+  {
+    double MH_over_R = params_->factor_comp_;
+    density_current = MH_over_R * press / temperature_current_[gp];
+    ddensity_dp = MH_over_R / temperature_current_[gp];
+    ddensity_dT = -MH_over_R * press / temperature_current_[gp] / temperature_current_[gp];
+    dddensity_dTdp = -MH_over_R / temperature_current_[gp] / temperature_current_[gp];
+  }
+  density_current_[gp] = density_current;
+  // if the was no previous step so the density there hasn't been set so use current one
+  if (!density_set_flag[gp])
+  {
+    density_n_[gp] = density_current;
+    density_set_flag[gp] = true;
+  }
+  density_n = density_n_[gp];
   if (save)
   {
     (void)gp;
@@ -277,8 +300,12 @@ void Mat::StructPoroMasstransfer::vis_names(std::map<std::string, int>& names)
 {
   // call base class
   StructPoro::vis_names(names);
-  //  std::string name = "reference_porosity";
-  //  names[name] = 1;  // scalar
+  std::string name = "dtemperature_dt_";
+  names[name] = 1;  // scalar
+  name = "masstransferRate_";
+  names[name] = 1;  // scalar
+  name = "masstransfer_dp_";
+  names[name] = 1;  // scalar
 }
 
 /*----------------------------------------------------------------------*
@@ -288,12 +315,39 @@ bool Mat::StructPoroMasstransfer::vis_data(
 {
   // call base class
   if (StructPoro::vis_data(name, data, numgp, eleID)) return true;
-  //  if (name == "reference_porosity")
-  //  {
-  //    if ((int)data.size() != 1) FOUR_C_THROW("size mismatch");
-  //    data[0] = RefPorosityAv();
-  //    return true;
-  //  }
+  if (name == "dtemperature_dt_")
+  {
+    if (data.size() != 1) FOUR_C_THROW("size mismatch");
+    for (double i : dtemperature_dt_)
+    {
+      data[0] += i;
+    }
+    data[0] = data[0] / dtemperature_dt_.size();
+
+    return true;
+  }
+  if (name == "masstransferRate_")
+  {
+    if (data.size() != 1) FOUR_C_THROW("size mismatch");
+    for (double i : masstransferRate_)
+    {
+      data[0] += i;
+    }
+    data[0] = data[0] / masstransferRate_.size();
+
+    return true;
+  }
+  if (name == "masstransfer_dp_")
+  {
+    if (data.size() != 1) FOUR_C_THROW("size mismatch");
+    for (double i : masstransfer_dp_)
+    {
+      data[0] += i;
+    }
+    data[0] = data[0] / masstransfer_dp_.size();
+
+    return true;
+  }
   return false;
 }
 

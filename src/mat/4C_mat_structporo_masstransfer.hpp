@@ -41,6 +41,15 @@ namespace Mat
       /// determine if to use a constant rate function (0) or linear in pressure(1)
       int functionID_;
 
+      /// determine if to use an incompressible (0), weakly compressible (1) or ideal gas (3)
+      int compressibleID_;
+
+      /// factor needed in compressible material
+      double factor_comp_;
+
+      /// time when the reaction starts
+      double reaction_start_time_;
+
       /// the constant or linear factor determining the mass transfer rate depending on functionID_
       double rateConstant_;
       //@}
