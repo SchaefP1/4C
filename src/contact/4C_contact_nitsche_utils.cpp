@@ -84,7 +84,7 @@ void Mortar::ElementNitscheData<parent_distype>::assemble_rhs(
       break;
     case CONTACT::VecBlockType::scatra:
       if (mele->mo_data().parent_scalar_dof().size())
-        assemble_rhs<1>(mele, ssi_data_.rhs_s_, mele->mo_data().parent_scalar_dof(), fc);
+        assemble_rhs<3>(mele, ssi_data_.rhs_s_, mele->mo_data().parent_scalar_dof(), fc);
       break;
     case CONTACT::VecBlockType::elch:
       if (mele->mo_data().parent_scalar_dof().size())
@@ -136,11 +136,15 @@ void Mortar::ElementNitscheData<parent_distype>::assemble_matrix(Mortar::Element
       break;
     case CONTACT::MatBlockType::scatra_displ:
       if (mele->mo_data().parent_scalar_dof().size())
-        assemble_matrix<1>(mele, ssi_data_.k_sd_, mele->mo_data().parent_scalar_dof(), kc);
+      {
+        assemble_matrix<3>(mele, ssi_data_.k_sd_, mele->mo_data().parent_scalar_dof(), kc);
+      }
       break;
     case CONTACT::MatBlockType::scatra_scatra:
       if (mele->mo_data().parent_scalar_dof().size())
-        assemble_matrix<1>(mele, ssi_data_.k_ss_, mele->mo_data().parent_scalar_dof(), kc);
+      {
+        assemble_matrix<3>(mele, ssi_data_.k_ss_, mele->mo_data().parent_scalar_dof(), kc);
+      }
       break;
     case CONTACT::MatBlockType::displ_elch:
       assemble_matrix<Core::FE::dim<parent_distype>>(

@@ -694,8 +694,9 @@ void CONTACT::IntegratorNitschePoroScatra::integrate_scatra_test(const double fa
 
   for (int s = 0; s < ele.num_node(); ++s)
   {
-    *(ele.get_nitsche_container().rhs_s(Core::FE::get_parent_node_number_from_face_node_number(
-        ele.parent_element()->shape(), ele.face_parent_number(), s))) +=
+    *(ele.get_nitsche_container().rhs_s(
+        2 + 3 * Core::FE::get_parent_node_number_from_face_node_number(
+                    ele.parent_element()->shape(), ele.face_parent_number(), s))) +=
         time_fac_rhs * val * shape_func(s);
   }
 
@@ -704,8 +705,8 @@ void CONTACT::IntegratorNitschePoroScatra::integrate_scatra_test(const double fa
     double* row = ele.get_nitsche_container().kss(d_testval_ds.first);
     for (int s = 0; s < ele.num_node(); ++s)
     {
-      row[Core::FE::get_parent_node_number_from_face_node_number(
-          ele.parent_element()->shape(), ele.face_parent_number(), s)] -=
+      row[2 + 3 * Core::FE::get_parent_node_number_from_face_node_number(
+                      ele.parent_element()->shape(), ele.face_parent_number(), s)] -=
           time_fac * fac * jac * wgt * d_testval_ds.second * shape_func(s);
     }
   }
@@ -748,9 +749,9 @@ void CONTACT::IntegratorNitschePoroScatra::setup_gp_concentrations(Mortar::Eleme
 {
   Core::LinAlg::SerialDenseVector ele_conc(shape_func.length());
   for (int i = 0; i < ele.num_node(); ++i)
-    ele_conc(i) =
-        ele.mo_data().parent_scalar().at(Core::FE::get_parent_node_number_from_face_node_number(
-            ele.parent_element()->shape(), ele.face_parent_number(), i));
+    ele_conc(i) = ele.mo_data().parent_scalar().at(
+        2 + 3 * Core::FE::get_parent_node_number_from_face_node_number(
+                    ele.parent_element()->shape(), ele.face_parent_number(), i));
 
   // calculate gp concentration
   gp_conc = shape_func.dot(ele_conc);
@@ -760,8 +761,8 @@ void CONTACT::IntegratorNitschePoroScatra::setup_gp_concentrations(Mortar::Eleme
   d_conc_dc.clear();
   for (int i = 0; i < ele.num_node(); ++i)
     d_conc_dc[ele.mo_data().parent_scalar_dof().at(
-        Core::FE::get_parent_node_number_from_face_node_number(
-            ele.parent_element()->shape(), ele.face_parent_number(), i))] = shape_func(i);
+        2 + 3 * Core::FE::get_parent_node_number_from_face_node_number(
+                    ele.parent_element()->shape(), ele.face_parent_number(), i))] = shape_func(i);
 
   // calculate derivative of concentration w.r.t. displacements
   std::size_t deriv_size = 0;

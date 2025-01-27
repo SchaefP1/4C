@@ -131,7 +131,7 @@ namespace Mortar
 
     static constexpr int num_parent_disp_dof =
         Core::FE::num_nodes<parent_distype> * Core::FE::dim<parent_distype>;
-    static constexpr int num_parent_scatra_dof = Core::FE::num_nodes<parent_distype>;
+    static constexpr int num_parent_scatra_dof = Core::FE::num_nodes<parent_distype> * 3;
 
     Core::LinAlg::Matrix<num_parent_scatra_dof, 1> rhs_s_;
     std::unordered_map<int, Core::LinAlg::Matrix<num_parent_scatra_dof, 1>> k_ss_;
@@ -213,7 +213,6 @@ namespace Mortar
         const std::unordered_map<int,
             Core::LinAlg::Matrix<Core::FE::num_nodes<parent_distype> * num_dof_per_node, 1>>& k,
         std::vector<int>& dofs, std::shared_ptr<Core::LinAlg::SparseMatrix> kc) const;
-
 
     void clear() override
     {
