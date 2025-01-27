@@ -124,6 +124,7 @@ int Discret::Elements::ScaTraEleCalc<distype, probdim>::evaluate_action(
       // do a loop for systems of transported scalars
       for (int& writefluxid : *writefluxids)
       {
+        // I think here is where the convection actually happens
         int k = writefluxid - 1;
         // calculate flux vectors for actual scalar
         eflux.clear();

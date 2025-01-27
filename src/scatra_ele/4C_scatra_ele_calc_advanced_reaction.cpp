@@ -75,6 +75,13 @@ void Discret::Elements::ScaTraEleCalcAdvReac<distype, probdim>::get_material_par
   // get the material
   std::shared_ptr<Core::Mat::Material> material = ele->material();
 
+  std::shared_ptr<Core::Mat::Material> material0 = ele->material(0);
+  std::shared_ptr<Core::Mat::Material> material1 = ele->material(1);
+  std::shared_ptr<Core::Mat::Material> material2 = ele->material(2);
+  //  std::cout << "Mats are " << material0->material_type() << " " << material1->material_type() <<
+  //  " "
+  //            << material2->material_type() << " " << std::endl;
+
   // We may have some reactive and some non-reactive elements in one discretisation.
   // But since the calculation classes are singleton, we have to reset all reactive stuff in case
   // of non-reactive elements:

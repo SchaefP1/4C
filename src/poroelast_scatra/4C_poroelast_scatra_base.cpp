@@ -175,6 +175,23 @@ void PoroElastScaTra::PoroScatraBase::set_velocity_fields()
     velnp = volcoupl_fluidscatra_->apply_vector_mapping21(*poro_->fluid_field()->velnp());
   }
 
+  // TODO this is were I can hack possibly the convection factor: I need p and T for it and mat
+  // mat paras (capacities). Those I am not sure if I can access them easily so hard-code for now
+  // problem: while I can access the values, it is part of a gradient so I cant fix it that easy
+
+
+  // this contains all scalars, T is the third
+  std::shared_ptr<const Core::LinAlg::Vector<double>> phinp_f = nullptr;
+
+  if (matchinggrid_)
+  {
+    phinp_f = scatra_->scatra_field()->phinp();
+  }
+  else
+  {
+    phinp_f = volcoupl_fluidscatra_->apply_vector_mapping12(*scatra_->scatra_field()->phinp());
+  }
+
   // Modify the vector to set velocity to zero while keeping p
   std::shared_ptr<Core::LinAlg::Vector<double>> zero_convel_ptr =
       std::make_shared<Core::LinAlg::Vector<double>>(*convel);
