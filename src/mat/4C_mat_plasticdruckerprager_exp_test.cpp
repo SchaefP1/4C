@@ -55,11 +55,13 @@ Core::Communication::ParObject* Mat::PlasticDruckerPragerExpTestType::create(
   return plastic;
 }
 
-Mat::PlasticDruckerPragerExpTest::PlasticDruckerPragerExpTest() : params_(nullptr) {}
+Mat::PlasticDruckerPragerExpTest::PlasticDruckerPragerExpTest() : params_(nullptr), rho_average_(0)
+{
+}
 
 Mat::PlasticDruckerPragerExpTest::PlasticDruckerPragerExpTest(
     Mat::PAR::PlasticDruckerPragerExpTest* params)
-    : params_(params)
+    : params_(params), rho_average_(0)
 {
 }
 
@@ -77,6 +79,7 @@ void Mat::PlasticDruckerPragerExpTest::pack(Core::Communication::PackBuffer& dat
     add_to_pack(data, strainpllast_.at(var));
     add_to_pack(data, strainbarpllast_.at(var));
   }
+  add_to_pack(data, rho_average_);
 }
 
 void Mat::PlasticDruckerPragerExpTest::unpack(Core::Communication::UnpackBuffer& buffer)
@@ -128,6 +131,187 @@ void Mat::PlasticDruckerPragerExpTest::unpack(Core::Communication::UnpackBuffer&
     }
   }
 }
+
+void Mat::PlasticDruckerPragerExpTest::evaluate_cauchy_n_dir_and_derivatives(
+    const Core::LinAlg::Matrix<3, 3>& defgrd, const Core::LinAlg::Matrix<3, 1>& n,
+    const Core::LinAlg::Matrix<3, 1>& dir, double& cauchy_n_dir,
+    Core::LinAlg::Matrix<3, 1>* d_cauchyndir_dn, Core::LinAlg::Matrix<3, 1>* d_cauchyndir_ddir,
+    Core::LinAlg::Matrix<9, 1>* d_cauchyndir_dF, Core::LinAlg::Matrix<9, 9>* d2_cauchyndir_dF2,
+    Core::LinAlg::Matrix<9, 3>* d2_cauchyndir_dF_dn,
+    Core::LinAlg::Matrix<9, 3>* d2_cauchyndir_dF_ddir, int gp, int eleGID,
+    const double* concentration, const double* temp, double* d_cauchyndir_dT,
+    Core::LinAlg::Matrix<9, 1>* d2_cauchyndir_dF_dT)
+{
+  std::cout << "defgrd:" << std::endl;
+  defgrd.print(std::cout);
+  //  // reset sigma contracted with n and dir
+  //  cauchy_n_dir = 0.0;
+  //  double temperature = 293.15;
+  //  double temperature_0 = 293.15;
+  //  double rho_s = 0.0;
+  //  double rho_ss = 8520.0;
+  //  double rho_s0 = 8400.0;
+  //  double scaling_factor = 1.0;
+  //
+  //  double alpha_temp = 13.0e-6;  // this is the value for steel just to test
+  //  double alpha_reaction = 0.065;
+  //  scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
+  //                   (1.0 + alpha_reaction * (rho_average_ - rho_s0) / (rho_ss - rho_s0));
+  //
+  //  //std::cout << "evaluate_cauchy_n_dir_and_derivatives " << rho_average_ << " " <<
+  //  scaling_factor << std::endl; static Core::LinAlg::Matrix<6, 1> idV(true); for (int i = 0; i <
+  //  3; ++i) idV(i) = 1.0; static Core::LinAlg::Matrix<3, 3> idM(true); for (int i = 0; i < 3; ++i)
+  //  idM(i, i) = 1.0; static Core::LinAlg::Matrix<3, 3> iFinM(true); for (int i = 0; i < 3; ++i)
+  //  iFinM(i, i) = 1.0; iFinM.scale(1 / scaling_factor);
+  //  // TODO I need my inelasatic stuff here
+  //  // inelastic_->evaluate_inverse_inelastic_def_grad(&defgrd, iFinM);
+  //  static Core::LinAlg::Matrix<3, 3> FeM(true);
+  //  FeM.multiply_nn(1.0, defgrd, iFinM, 0.0);
+  //
+  //  // get elastic left cauchy-green tensor and corresponding principal invariants
+  //  static Core::LinAlg::Matrix<3, 3> beM(true);
+  //  beM.multiply_nt(1.0, FeM, FeM, 0.0);
+  //  static Core::LinAlg::Matrix<6, 1> beV_strain(true);
+  //  Core::LinAlg::Voigt::Strains::matrix_to_vector(beM, beV_strain);
+  //  static Core::LinAlg::Matrix<3, 1> prinv(true);
+  //  Core::LinAlg::Voigt::Strains::invariants_principal(prinv, beV_strain);
+  //  static Core::LinAlg::Matrix<6, 1> beV_stress(true);
+  //  Core::LinAlg::Voigt::Stresses::matrix_to_vector(beM, beV_stress);
+  //
+  //  static Core::LinAlg::Matrix<3, 1> beMdn(true);
+  //  beMdn.multiply(1.0, beM, n, 0.0);
+  //  const double beMdnddir = beMdn.dot(dir);
+  //  static Core::LinAlg::Matrix<3, 1> beMddir(true);
+  //  beMddir.multiply(1.0, beM, dir, 0.0);
+  //
+  //  static Core::LinAlg::Matrix<3, 3> ibeM(true);
+  //  ibeM.invert(beM);
+  //  static Core::LinAlg::Matrix<6, 1> ibeV_stress(true);
+  //  Core::LinAlg::Voigt::Stresses::matrix_to_vector(ibeM, ibeV_stress);
+  //  static Core::LinAlg::Matrix<3, 1> ibeMdn(true);
+  //  ibeMdn.multiply(1.0, ibeM, n, 0.0);
+  //  const double ibeMdnddir = ibeMdn.dot(dir);
+  //  static Core::LinAlg::Matrix<3, 1> ibeMddir(true);
+  //  ibeMddir.multiply(1.0, ibeM, dir, 0.0);
+  //
+  //  // derivatives of principle invariants of elastic left cauchy-green tensor
+  //  static Core::LinAlg::Matrix<3, 1> dPI(true);
+  //  static Core::LinAlg::Matrix<6, 1> ddPII(true);
+  //  evaluate_invariant_derivatives(prinv, gp, eleGID, dPI, ddPII);
+  //
+  //  const double detFe = FeM.determinant();
+  //  const double nddir = n.dot(dir);
+  //  const double prefac = 2.0 / detFe;
+  //
+  //  // calculate \mat{\sigma} \cdot \vec{n} \cdot \vec{v}
+  //  cauchy_n_dir = prefac * (prinv(1) * dPI(1) * nddir + prinv(2) * dPI(2) * nddir +
+  //                              dPI(0) * beMdnddir - prinv(2) * dPI(1) * ibeMdnddir);
+  //
+  //  if (d_cauchyndir_dn)
+  //  {
+  //    d_cauchyndir_dn->update(prinv(1) * dPI(1) + prinv(2) * dPI(2), dir, 0.0);
+  //    d_cauchyndir_dn->update(dPI(0), beMddir, 1.0);
+  //    d_cauchyndir_dn->update(-prinv(2) * dPI(1), ibeMddir, 1.0);
+  //    d_cauchyndir_dn->scale(prefac);
+  //  }
+  //
+  //  if (d_cauchyndir_ddir)
+  //  {
+  //    d_cauchyndir_ddir->update(prinv(1) * dPI(1) + prinv(2) * dPI(2), n, 0.0);
+  //    d_cauchyndir_ddir->update(dPI(0), beMdn, 1.0);
+  //    d_cauchyndir_ddir->update(-prinv(2) * dPI(1), ibeMdn, 1.0);
+  //    d_cauchyndir_ddir->scale(prefac);
+  //  }
+  //
+  //  if (d_cauchyndir_dF)
+  //  {
+  //    static Core::LinAlg::Matrix<6, 1> d_I1_be(true);
+  //    d_I1_be = idV;
+  //    static Core::LinAlg::Matrix<6, 1> d_I2_be(true);
+  //    d_I2_be.update(prinv(0), idV, -1.0, beV_stress);
+  //    static Core::LinAlg::Matrix<6, 1> d_I3_be(true);
+  //    d_I3_be.update(prinv(2), ibeV_stress, 0.0);
+  //
+  //    // calculation of \partial b_{el} / \partial F (elastic left cauchy-green w.r.t. deformation
+  //    // gradient)
+  //    static Core::LinAlg::Matrix<6, 9> d_be_dFe(true);
+  //    d_be_dFe.clear();
+  //    add_right_non_symmetric_holzapfel_product_strain_like(d_be_dFe, idM, FeM, 1.0);
+  //    static Core::LinAlg::Matrix<9, 9> d_Fe_dF(true);
+  //    d_Fe_dF.clear();
+  //    add_non_symmetric_product(1.0, idM, iFinM, d_Fe_dF);
+  //    static Core::LinAlg::Matrix<6, 9> d_be_dF(true);
+  //    d_be_dF.multiply(1.0, d_be_dFe, d_Fe_dF, 0.0);
+  //
+  //    // calculation of \partial I_i / \partial F (Invariants of b_{el} w.r.t. deformation
+  //    gradient) static Core::LinAlg::Matrix<9, 1> d_I1_dF(true); static Core::LinAlg::Matrix<9, 1>
+  //    d_I2_dF(true); static Core::LinAlg::Matrix<9, 1> d_I3_dF(true); d_I1_dF.multiply_tn(1.0,
+  //    d_be_dF, d_I1_be, 0.0); d_I2_dF.multiply_tn(1.0, d_be_dF, d_I2_be, 0.0);
+  //    d_I3_dF.multiply_tn(1.0, d_be_dF, d_I3_be, 0.0);
+  //
+  //    // add d_cauchyndir_dI1 \odot d_I1_dF and clear static matrix
+  //    d_cauchyndir_dF->update(prefac * (prinv(1) * ddPII(5) * nddir + prinv(2) * ddPII(4) * nddir
+  //    +
+  //                                         ddPII(0) * beMdnddir - prinv(2) * ddPII(5) *
+  //                                         ibeMdnddir),
+  //        d_I1_dF, 0.0);
+  //    // add d_cauchyndir_dI2 \odot d_I2_dF
+  //    d_cauchyndir_dF->update(
+  //        prefac * (dPI(1) * nddir + prinv(1) * ddPII(1) * nddir + prinv(2) * ddPII(3) * nddir +
+  //                     ddPII(5) * beMdnddir - prinv(2) * ddPII(1) * ibeMdnddir),
+  //        d_I2_dF, 1.0);
+  //    // add d_cauchyndir_dI3 \odot d_I3_dF
+  //    d_cauchyndir_dF->update(
+  //        prefac * (prinv(1) * ddPII(3) * nddir + dPI(2) * nddir + prinv(2) * ddPII(2) * nddir +
+  //                     ddPII(4) * beMdnddir - dPI(1) * ibeMdnddir - prinv(2) * ddPII(3) *
+  //                     ibeMdnddir),
+  //        d_I3_dF, 1.0);
+  //
+  //    // next three updates add partial derivative of snt w.r.t. the deformation gradient F for
+  //    // constant invariants first part is term arising from \partial Je^{-1} / \partial F
+  //    static Core::LinAlg::Matrix<3, 3> iFeM(true);
+  //    static Core::LinAlg::Matrix<3, 3> iFeTM(true);
+  //    iFeM.invert(FeM);
+  //    iFeTM.update_t(1.0, iFeM, 0.0);
+  //    static Core::LinAlg::Matrix<9, 1> iFeTV(true);
+  //    Core::LinAlg::Voigt::matrix_3x3_to_9x1(iFeTM, iFeTV);
+  //    static Core::LinAlg::Matrix<1, 9> d_iJe_dFV(true);
+  //    d_iJe_dFV.multiply_tn(1.0, iFeTV, d_Fe_dF, 0.0);
+  //    d_cauchyndir_dF->update_t(-cauchy_n_dir, d_iJe_dFV, 1.0);
+  //
+  //    // second part is term arising from \partial b_el * n * v / \partial F
+  //    static Core::LinAlg::Matrix<3, 3> FeMiFinTM(true);
+  //    FeMiFinTM.multiply_nt(1.0, FeM, iFinM, 0.0);
+  //    static Core::LinAlg::Matrix<3, 1> tempvec(true);
+  //    tempvec.multiply_tn(1.0, FeMiFinTM, n, 0.0);
+  //    static Core::LinAlg::Matrix<3, 3> d_bednddir_dF(true);
+  //    d_bednddir_dF.multiply_nt(1.0, dir, tempvec, 0.0);
+  //    // now reuse tempvec
+  //    tempvec.multiply_tn(1.0, FeMiFinTM, dir, 0.0);
+  //    d_bednddir_dF.multiply_nt(1.0, n, tempvec, 1.0);
+  //    static Core::LinAlg::Matrix<9, 1> d_bednddir_dFV(true);
+  //    Core::LinAlg::Voigt::matrix_3x3_to_9x1(d_bednddir_dF, d_bednddir_dFV);
+  //    d_cauchyndir_dF->update(prefac * dPI(0), d_bednddir_dFV, 1.0);
+  //
+  //    // third part is term arising from \partial b_el^{-1} * n * v / \partial F
+  //    static Core::LinAlg::Matrix<3, 3> iFM(true);
+  //    iFM.invert(defgrd);
+  //    static Core::LinAlg::Matrix<3, 1> tempvec2(true);
+  //    tempvec.multiply(1.0, ibeM, dir, 0.0);
+  //    tempvec2.multiply(1.0, iFM, n, 0.0);
+  //    static Core::LinAlg::Matrix<3, 3> d_ibednddir_dFM(true);
+  //    d_ibednddir_dFM.multiply_nt(1.0, tempvec, tempvec2, 0.0);
+  //    // now reuse tempvecs
+  //    tempvec.multiply(1.0, ibeM, n, 0.0);
+  //    tempvec2.multiply(1.0, iFM, dir, 0.0);
+  //    d_ibednddir_dFM.multiply_nt(1.0, tempvec, tempvec2, 1.0);
+  //    d_ibednddir_dFM.scale(-1.0);
+  //    static Core::LinAlg::Matrix<9, 1> d_ibednddir_dFV(true);
+  //    Core::LinAlg::Voigt::matrix_3x3_to_9x1(d_ibednddir_dFM, d_ibednddir_dFV);
+  //    d_cauchyndir_dF->update(-prefac * prinv(2) * dPI(1), d_ibednddir_dFV, 1.0);
+  //  }
+}
+
 void Mat::PlasticDruckerPragerExpTest::setup(
     int numgp, const Core::IO::InputParameterContainer& container)
 {
@@ -243,11 +427,11 @@ void Mat::PlasticDruckerPragerExpTest::EvaluateFAD(const Core::LinAlg::Matrix<3,
 {
   // params.print();
 
-  double temperature = 1.0;
+  double temperature = 293.15;
   double temperature_0 = 293.15;
-  double rho_s = 1.0;
-  double rho_ss = 1.0;
-  double rho_s0 = 0.0;
+  double rho_s = 0.0;
+  double rho_ss = 8520.0;
+  double rho_s0 = 8400.0;
   double scaling_factor = 1.0;
 
   double alpha_temp = 13.0e-6;  // this is the value for steel just to test
@@ -285,6 +469,7 @@ void Mat::PlasticDruckerPragerExpTest::EvaluateFAD(const Core::LinAlg::Matrix<3,
       FOUR_C_THROW("Not enough scalars to use my expansion test material");
     }
   }
+  rho_average_ = rho_s;  // only works for homogeneous exp. TODO change
   // std::cout << "temperature:" << temperature  << "rho_s:" << rho_s << std::endl;
   scaling_factor = alpha_temp * (temperature - temperature_0) +
                    alpha_reaction * (rho_s - rho_s0) / (rho_ss - rho_s0);

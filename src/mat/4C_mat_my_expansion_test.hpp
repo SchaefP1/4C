@@ -149,6 +149,28 @@ namespace Mat
     /// material mass density
     double density() const override { return params_->density_; }
 
+    void evaluate_cauchy_n_dir_and_derivatives(const Core::LinAlg::Matrix<3, 3>& defgrd,
+        const Core::LinAlg::Matrix<3, 1>& n, const Core::LinAlg::Matrix<3, 1>& dir,
+        double& cauchy_n_dir, Core::LinAlg::Matrix<3, 1>* d_cauchyndir_dn,
+        Core::LinAlg::Matrix<3, 1>* d_cauchyndir_ddir, Core::LinAlg::Matrix<9, 1>* d_cauchyndir_dF,
+        Core::LinAlg::Matrix<9, 9>* d2_cauchyndir_dF2,
+        Core::LinAlg::Matrix<9, 3>* d2_cauchyndir_dF_dn,
+        Core::LinAlg::Matrix<9, 3>* d2_cauchyndir_dF_ddir, int gp, int eleGID,
+        const double* concentration, const double* temp, double* d_cauchyndir_dT,
+        Core::LinAlg::Matrix<9, 1>* d2_cauchyndir_dF_dT) override;
+
+    /*!
+     * @brief calculates the derivatives of the hyper-elastic laws with respect to the invariants
+     *
+     * @param[in] prinv   Principal invariants of the elastic right Cauchy-Green tensor
+     * @param[in] gp      current gauss point
+     * @param[in] eleGID  Element ID
+     * @param[out] dPI    First derivative w.r.t. principle invariants
+     * @param[out] ddPII  Second derivative w.r.t. principle invariants
+     */
+    void evaluate_invariant_derivatives(const Core::LinAlg::Matrix<3, 1>& prinv, int gp, int eleGID,
+        Core::LinAlg::Matrix<3, 1>& dPI, Core::LinAlg::Matrix<6, 1>& ddPII) const;
+
     /// hyperelastic stress response plus elasticity tensor
     void evaluate(const Core::LinAlg::Matrix<3, 3>* defgrd,  ///< Deformation gradient
         const Core::LinAlg::Matrix<6, 1>* glstrain,          ///< Green-Lagrange strain
@@ -210,6 +232,10 @@ namespace Mat
 
     /// Map to elastin 3d matrix material summands
     std::vector<std::shared_ptr<Mat::Elastic::Summand>> potsumeliso_;
+
+    /// average rho para for exp. Hack and only works for homogeneous exp but ok for test
+    /// TODO: find better option
+    double rho_average_;
   };
 
 }  // namespace Mat

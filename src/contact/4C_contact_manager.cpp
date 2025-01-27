@@ -1066,7 +1066,7 @@ bool CONTACT::Manager::read_and_check_input(Teuchos::ParameterList& cparams) con
 
     if (problemtype != Core::ProblemType::structure &&
         problemtype != Core::ProblemType::poroelast && problemtype != Core::ProblemType::fsi_xfem &&
-        problemtype != Core::ProblemType::fpsi_xfem)
+        problemtype != Core::ProblemType::fpsi_xfem && problemtype != Core::ProblemType::poroscatra)
       FOUR_C_THROW(
           "GPTS algorithm only tested for structural, FSI-CutFEM, FPSI-CutFEM, and "
           "poroelastic problems");

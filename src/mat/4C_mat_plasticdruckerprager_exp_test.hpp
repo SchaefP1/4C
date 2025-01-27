@@ -100,6 +100,18 @@ namespace Mat
     {
       return std::make_shared<PlasticDruckerPragerExpTest>(*this);
     }
+
+    void evaluate_cauchy_n_dir_and_derivatives(const Core::LinAlg::Matrix<3, 3>& defgrd,
+        const Core::LinAlg::Matrix<3, 1>& n, const Core::LinAlg::Matrix<3, 1>& dir,
+        double& cauchy_n_dir, Core::LinAlg::Matrix<3, 1>* d_cauchyndir_dn,
+        Core::LinAlg::Matrix<3, 1>* d_cauchyndir_ddir, Core::LinAlg::Matrix<9, 1>* d_cauchyndir_dF,
+        Core::LinAlg::Matrix<9, 9>* d2_cauchyndir_dF2,
+        Core::LinAlg::Matrix<9, 3>* d2_cauchyndir_dF_dn,
+        Core::LinAlg::Matrix<9, 3>* d2_cauchyndir_dF_ddir, int gp, int eleGID,
+        const double* concentration, const double* temp, double* d_cauchyndir_dT,
+        Core::LinAlg::Matrix<9, 1>* d2_cauchyndir_dF_dT) override;
+
+
     void setup(int numgp, const Core::IO::InputParameterContainer& container) override;
     void update() override;
     /**
@@ -195,6 +207,10 @@ namespace Mat
     std::vector<double> strainbarpllast_;
     std::vector<double> strainbarplcurr_;
     bool isinit_;
+
+    /// average rho para for exp. Hack and only works for homogeneous exp but ok for test
+    /// TODO: find better option
+    double rho_average_;
   };
 }  // namespace Mat
 FOUR_C_NAMESPACE_CLOSE
