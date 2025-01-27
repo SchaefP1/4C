@@ -33,7 +33,7 @@ CONTACT::NitscheStrategyPoroScatra::NitscheStrategyPoroScatra(const Epetra_Map* 
 }
 
 CONTACT::NitscheStrategyPoroScatra::NitscheStrategyPoroScatra(
-    const std::shared_ptr<CONTACT::AbstractStratDataContainer>& data_ptr,
+    const std::shared_ptr<CONTACT::AbstractStrategyDataContainer>& data_ptr,
     const Epetra_Map* dof_row_map, const Epetra_Map* NodeRowMap, Teuchos::ParameterList params,
     std::vector<std::shared_ptr<CONTACT::Interface>> interface, int dim, const MPI_Comm& comm,
     double alphaf, int maxdof)

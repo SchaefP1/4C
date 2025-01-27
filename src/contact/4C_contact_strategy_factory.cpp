@@ -1636,7 +1636,7 @@ std::shared_ptr<CONTACT::AbstractStrategy> CONTACT::STRATEGY::Factory::build_str
     }
     else if (params.get<int>("PROBTYPE") == Inpar::CONTACT::poroscatra)
     {
-      data_ptr = std::make_shared<CONTACT::AbstractStratDataContainer>();
+      data_ptr = std::make_shared<CONTACT::AbstractStrategyDataContainer>();
       strategy_ptr = std::make_shared<NitscheStrategyPoroScatra>(
           data_ptr, dof_row_map, node_row_map, params, interfaces, dim, comm_ptr, 0, dof_offset);
     }

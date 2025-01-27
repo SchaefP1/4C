@@ -6,12 +6,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "4C_fem_general_extract_values.hpp"
+#include "4C_fem_general_utils_interpolation.hpp"
 #include "4C_global_data.hpp"
 #include "4C_mat_fluidporo.hpp"
 #include "4C_mat_fluidporo_multiphase.hpp"
 #include "4C_mat_list.hpp"
 #include "4C_mat_structporo.hpp"
-#include "4C_so3_element_service.hpp"
 #include "4C_so3_poro_scatra.hpp"
 #include "4C_so3_poro_scatra_eletypes.hpp"
 #include "4C_utils_function.hpp"
@@ -153,8 +153,7 @@ void Discret::Elements::So3PoroScatra<So3Ele, distype>::get_cauchy_n_dir_and_der
   double d_cauchyndir_ds_gp(0.0);
   if (d_cauchyndir_ds != nullptr)
   {
-    auto scalar_values_at_xi =
-        Discret::Elements::project_nodal_quantity_to_xi<distype>(xi, scalar_nodal_values);
+    auto scalar_values_at_xi = Core::FE::interpolate_to_xi<distype>(xi, scalar_nodal_values);
     So3Ele::get_cauchy_n_dir_and_derivatives_at_xi(xi, disp_nodal_values, n, dir, cauchy_n_dir,
         d_cauchyndir_dd, nullptr, nullptr, nullptr, nullptr, d_cauchyndir_dn, d_cauchyndir_ddir,
         d_cauchyndir_dxi, nullptr, nullptr, nullptr, scalar_values_at_xi.data(),
