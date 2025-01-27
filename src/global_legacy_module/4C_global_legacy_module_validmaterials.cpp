@@ -1202,6 +1202,30 @@ std::shared_ptr<std::vector<std::shared_ptr<Mat::MaterialDefinition>>> Global::v
     Mat::append_material_definition(matlist, m);
   }
 
+
+  /*----------------------------------------------------------------------*/
+  // Plastic linear elastic St.Venant Kirchhoff / Drucker Prager plasticity with expansion
+  {
+    auto m = std::make_shared<Mat::MaterialDefinition>("MAT_Struct_DruckerPrager_Exp_Test",
+        "elastic St.Venant Kirchhoff / plastic drucker prager with expansion",
+        Core::Materials::m_pldruckprag_exp_test);
+
+    m->add_component(entry<double>("YOUNG", {.description = "Young's modulus"}));
+    m->add_component(entry<double>("NUE", {.description = "Poisson's ratio"}));
+    m->add_component(entry<double>("DENS", {.description = "Density"}));
+    m->add_component(entry<double>("ISOHARD", {.description = "linear isotropic hardening"}));
+    m->add_component(entry<double>("TOL", {.description = "Local Newton iteration tolerance"}));
+    m->add_component(entry<double>("C", {.description = "cohesion"}));
+    m->add_component(entry<double>("ETA", {.description = "Drucker Prager Constant Eta"}));
+    m->add_component(entry<double>("XI", {.description = "Drucker Prager Constant Xi"}));
+    m->add_component(entry<double>("ETABAR", {.description = "Drucker Prager Constant Etabar"}));
+    m->add_component(entry<double>("EXPCOEFF", {.description = "Expansion coefficient"}));
+    m->add_component(entry<int>("MAXITER",
+        {.description = "Maximum Iterations for local Neutron Raphson", .default_value = 50}));
+
+    Mat::append_material_definition(matlist, m);
+  }
+
   /*----------------------------------------------------------------------*/
   // Linear thermo-elastic St.Venant Kirchhoff / plastic von Mises
   {

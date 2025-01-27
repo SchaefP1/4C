@@ -130,18 +130,19 @@ namespace Core::Materials
     m_particle_sph_boundary,  ///< particle material for SPH boundary
     m_particle_dem,           ///< particle material for DEM
     m_particle_wall_dem,      ///< particle wall material for DEM
-    m_pldruckprag,       ///< Plastic linear elastic St.Venant Kirchhoff / Drucker Prager plasticity
-    m_plgtn,             ///< Plastic linear elastic St.Venant Kirchhoff / GTN plasticity
-    m_plelasthyper,      ///< general hyperelastic material for finite strain von-Mises plasticity
-                         ///< using a semi-smooth Newton strategy (only in combination with such
-                         ///< elements!)
-    m_plelasthyperVCU,   ///< general hyperelastic material for finite strain von-Mises plasticity
-                         ///< using a variational constitutive update
-    m_pllinelast,        ///< linear elasticity (St. Venant Kirchhoff) and von Mises plasticity
-    m_plnlnlogneohooke,  ///< Neo-Hooke elasticity with logarithmic finite strain von Mises
-                         ///< plasticity
-    m_poro_law_constant,             ///< constant porosity
-    m_poro_law_linear,               ///< linear law for porosity
+    m_pldruckprag,  ///< Plastic linear elastic St.Venant Kirchhoff / Drucker Prager plasticity
+    m_pldruckprag_exp_test,  ///< m_pldruckprag but with expansion
+    m_plgtn,                 ///< Plastic linear elastic St.Venant Kirchhoff / GTN plasticity
+    m_plelasthyper,       ///< general hyperelastic material for finite strain von-Mises plasticity
+                          ///< using a semi-smooth Newton strategy (only in combination with such
+                          ///< elements!)
+    m_plelasthyperVCU,    ///< general hyperelastic material for finite strain von-Mises plasticity
+                          ///< using a variational constitutive update
+    m_pllinelast,         ///< linear elasticity (St. Venant Kirchhoff) and von Mises plasticity
+    m_plnlnlogneohooke,   ///< Neo-Hooke elasticity with logarithmic finite strain von Mises
+                          ///< plasticity
+    m_poro_law_constant,  ///< constant porosity
+    m_poro_law_linear,    ///< linear law for porosity
     m_poro_law_logNeoHooke_Penalty,  ///< neo hookeian like law for porosity + penalty term
     m_poro_law_incompr_skeleton,     ///< porosity law for incompressible skeleton phase
     m_poro_law_linear_biot,          ///< porosity law for linear biot law

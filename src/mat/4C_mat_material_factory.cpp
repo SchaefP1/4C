@@ -116,6 +116,7 @@
 #include "4C_mat_particle_wall_dem.hpp"
 #include "4C_mat_plastic_VarConstUpdate.hpp"
 #include "4C_mat_plasticdruckerprager.hpp"
+#include "4C_mat_plasticdruckerprager_exp_test.hpp"
 #include "4C_mat_plasticelasthyper.hpp"
 #include "4C_mat_plasticgtn.hpp"
 #include "4C_mat_plasticlinelast.hpp"
@@ -240,6 +241,10 @@ std::unique_ptr<Core::Mat::PAR::Parameter> Mat::make_parameter(
     case Core::Materials::m_pldruckprag:
     {
       return make_parameter_impl<Mat::PAR::PlasticDruckerPrager>(id, type, input_data);
+    }
+    case Core::Materials::m_pldruckprag_exp_test:
+    {
+      return make_parameter_impl<Mat::PAR::PlasticDruckerPragerExpTest>(id, type, input_data);
     }
     case Core::Materials::m_plgtn:
     {
