@@ -134,6 +134,7 @@
 #include "4C_mat_soret.hpp"
 #include "4C_mat_spring.hpp"
 #include "4C_mat_structporo.hpp"
+#include "4C_mat_structporo_masstransfer.hpp"
 #include "4C_mat_structporo_reaction.hpp"
 #include "4C_mat_structporo_reaction_ecm.hpp"
 #include "4C_mat_stvenantkirchhoff.hpp"
@@ -547,6 +548,10 @@ std::unique_ptr<Core::Mat::PAR::Parameter> Mat::make_parameter(
     case Core::Materials::m_structporo:
     {
       return make_parameter_impl<Mat::PAR::StructPoro>(id, type, input_data);
+    }
+    case Core::Materials::m_structporomasstransfer:
+    {
+      return make_parameter_impl<Mat::PAR::StructPoroMasstransfer>(id, type, input_data);
     }
     case Core::Materials::m_structpororeaction:
     {

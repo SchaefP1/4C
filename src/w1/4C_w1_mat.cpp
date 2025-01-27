@@ -38,6 +38,7 @@ void Discret::Elements::Wall1::w1_call_matgeononl(
 )
 {
   if (material->material_type() == Core::Materials::m_structporo or
+      material->material_type() == Core::Materials::m_structporomasstransfer or
       material->material_type() == Core::Materials::m_structpororeaction or
       material->material_type() == Core::Materials::m_structpororeactionECM)
   {
@@ -382,6 +383,7 @@ double Discret::Elements::Wall1::energy_internal(
     }
     break;
     case Core::Materials::m_structporo:
+    case Core::Materials::m_structporomasstransfer:
     case Core::Materials::m_structpororeaction:
     case Core::Materials::m_structpororeactionECM:
     {

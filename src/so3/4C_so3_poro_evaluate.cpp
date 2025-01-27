@@ -16,6 +16,7 @@
 #include "4C_mat_fluidporo_multiphase.hpp"
 #include "4C_mat_list.hpp"
 #include "4C_mat_structporo.hpp"
+#include "4C_mat_structporo_masstransfer.hpp"
 #include "4C_so3_poro.hpp"
 #include "4C_so3_poro_eletypes.hpp"
 #include "4C_structure_new_elements_paramsinterface.hpp"
@@ -680,7 +681,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::gauss_point_loop(Teuchos::Para
 
     fill_matrix_and_vectors(gp, shapefct, N_XYZ, J, press, porosity, velint, fvelint, fvelder,
         defgrd_inv, bop, C_inv, Finvgradp, dphi_dus, dJ_dus, dCinv_dus, dFinvdus_gradp, dFinvTdus,
-        erea_v, stiffmatrix, force, fstress);
+        erea_v, stiffmatrix, force, fstress, params);
   }
 }
 
@@ -972,10 +973,23 @@ void Discret::Elements::So3Poro<So3Ele, distype>::gauss_point_loop_od(
     compute_porosity_and_linearization_od(
         params, press, volchange, gp, shapefct, nullptr, porosity, dphi_dp);
 
+    //**************************************************mass source terms
+    //! mass source factor a at gp
+    double a = 0.0;
+    double da_dp = 0.0;
+    double da_dphi = 0.0;
+    double da_dJ = 0.0;  // unused
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
+          std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
+      masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ);
+    }
+
     // **********************evaluate stiffness matrix and force vector+++++++++++++++++++++++++
 
-    fill_matrix_and_vectors_od(gp, shapefct, N_XYZ, J, porosity, dphi_dp, velint, fvelint,
-        defgrd_inv, Gradp, bop, C_inv, stiffmatrix);
+    fill_matrix_and_vectors_od(gp, shapefct, N_XYZ, J, porosity, dphi_dp, a, da_dphi, da_dp, velint,
+        fvelint, defgrd_inv, Gradp, bop, C_inv, stiffmatrix);
 
     if (fluid_mat_->type() == Mat::PAR::darcy_brinkman)
     {
@@ -1518,6 +1532,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::get_materials()
   {
     struct_mat_ = std::dynamic_pointer_cast<Mat::StructPoro>(material());
     if (struct_mat_->material_type() != Core::Materials::m_structporo and
+        struct_mat_->material_type() != Core::Materials::m_structporomasstransfer and
         struct_mat_->material_type() != Core::Materials::m_structpororeaction and
         struct_mat_->material_type() != Core::Materials::m_structpororeactionECM)
       FOUR_C_THROW("invalid structure material for poroelasticity");
@@ -1548,6 +1563,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::get_materials_pressure_based()
     if (struct_mat_ == nullptr) FOUR_C_THROW("cast to poro material failed");
 
     if (struct_mat_->material_type() != Core::Materials::m_structporo and
+        struct_mat_->material_type() != Core::Materials::m_structporomasstransfer and
         struct_mat_->material_type() != Core::Materials::m_structpororeaction and
         struct_mat_->material_type() != Core::Materials::m_structpororeactionECM)
       FOUR_C_THROW("invalid structure material for poroelasticity");
@@ -1884,6 +1900,8 @@ inline void Discret::Elements::So3Poro<So3Ele, distype>::compute_linearization_o
     FOUR_C_THROW("invalid kinematic type!");
 }
 
+// I added params to this function as I need it for mass_transfer material, later remove and call
+// outside
 template <class So3Ele, Core::FE::CellType distype>
 void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const int& gp,
     const Core::LinAlg::Matrix<numnod_, 1>& shapefct,
@@ -1902,7 +1920,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
     const Core::LinAlg::Matrix<numdim_ * numdim_, numdof_>& dFinvTdus,
     Core::LinAlg::Matrix<numdof_, numdof_>& erea_v,
     Core::LinAlg::Matrix<numdof_, numdof_>* stiffmatrix, Core::LinAlg::Matrix<numdof_, 1>* force,
-    Core::LinAlg::Matrix<numstr_, 1>& fstress)
+    Core::LinAlg::Matrix<numstr_, 1>& fstress, Teuchos::ParameterList& params)
 {
   const double detJ_w = detJ_[gp] * intpoints_.weight(gp);
 
@@ -1924,6 +1942,18 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
       reatensor.multiply_tn(defgrd_inv, temp);
       reavel.multiply(reatensor, velint);
       reafvel.multiply(reatensor, fvelint);
+    }
+
+    //! mass source factor a at gp
+    double a = 0.0;
+    double da_dp = 0.0;  // unused except for OD so not here?
+    double da_dphi = 0.0;
+    double da_dJ = 0.0;
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
+          std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
+      masstransfer_mat->ComputeMasstransfer(params, press, gp, a, da_dp, da_dphi, da_dJ);
     }
 
     for (int idim = 0; idim < numdim_; idim++)
@@ -1954,6 +1984,12 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
          - J *  F^-T * Grad(p) * phi
          */
         (*force)(fk + idim) += fac * J * Finvgradp_idim * (-porosity);
+
+        /*-------mass source terms-------*/
+        if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+        {
+          (*force)(fk + idim) += 0.5 * fac * J * a * (fvelint(idim) - velint(idim));
+        }
       }
     }
 
@@ -1976,6 +2012,15 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
              detJ * w(gp) * ( J^2 * reacoeff * phi^2  ) * D(v_s)
              */
             erea_v(fk + idim, fi + jdim) += v * reatensor_i_j * shapefct(jnode);
+
+            /*-------mass source terms-------*/
+            if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+            {
+              // pretend a is a*unit matrix - TODO make better once runs
+              if (idim == jdim)
+                erea_v(fk + idim, fi + jdim) +=
+                    -0.5 * detJ_w * shapefct(inode) * J * a * shapefct(jnode);
+            }
           }
         }
       }
@@ -2114,6 +2159,32 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
                 }
               }
               (*stiffmatrix)(numdim_* inode + idim, fi + jdim) += val * shapefct(inode);
+            }
+          }
+        }
+      }
+    }
+
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      for (int idim = 0; idim < numdim_; idim++)
+      {
+        const double vel_j = velint(idim);
+        const double fvel_j = fvelint(idim);
+
+        for (int jdim = 0; jdim < numdim_; jdim++)
+        {
+          for (int jnode = 0; jnode < numnod_; jnode++)
+          {
+            const int fi = numdim_ * jnode;
+            // TODO document better
+            const double val = -0.5 * detJ_w * dJ_dus(fi + jdim) * (vel_j - fvel_j) *
+                               (dJ_dus(fi + jdim) * a + J * da_dJ * dJ_dus(fi + jdim) +
+                                   J * da_dphi * dphi_dus(fi + jdim));
+
+            for (int inode = 0; inode < numnod_; inode++)
+            {
+              (*stiffmatrix)(numdim_* inode + idim, fi + jdim) += shapefct(inode) * val;
             }
           }
         }
@@ -2389,8 +2460,8 @@ template <class So3Ele, Core::FE::CellType distype>
 void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors_od(const int& gp,
     const Core::LinAlg::Matrix<numnod_, 1>& shapefct,
     const Core::LinAlg::Matrix<numdim_, numnod_>& N_XYZ, const double& J, const double& porosity,
-    const double& dphi_dp, const Core::LinAlg::Matrix<numdim_, 1>& velint,
-    const Core::LinAlg::Matrix<numdim_, 1>& fvelint,
+    const double& dphi_dp, const double& a, const double& da_dphi, const double& da_dp,
+    const Core::LinAlg::Matrix<numdim_, 1>& velint, const Core::LinAlg::Matrix<numdim_, 1>& fvelint,
     const Core::LinAlg::Matrix<numdim_, numdim_>& defgrd_inv,
     const Core::LinAlg::Matrix<numdim_, 1>& Gradp,
     const Core::LinAlg::Matrix<numstr_, numdof_>& bop,
@@ -2453,6 +2524,28 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors_od(con
            - 2 * reacoeff * J * v^f * phi * d(phi)/dp  Dp
            + 2 * reacoeff * J * v^s * phi * d(phi)/dp  Dp
            */
+          (*stiffmatrix)(numdim_* inode + idim, fkp1 + numdim_) += shapefct(inode) * val;
+        }
+      }
+    }
+  }
+
+  if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+  {
+    const double fac = 0.5 * detJ_w * J * (da_dp + da_dphi * dphi_dp);
+    for (int idim = 0; idim < numdim_; idim++)
+    {
+      const double fvel_idim = fvelint(idim);
+      const double vel_idim = velint(idim);
+
+      for (int jnode = 0; jnode < numnod_; jnode++)
+      {
+        const int fkp1 = (numdim_ + 1) * jnode;
+
+        const double val = -fac * shapefct(jnode) * (vel_idim - fvel_idim);
+        for (int inode = 0; inode < numnod_; inode++)
+        {
+          // TODO document and double check
           (*stiffmatrix)(numdim_* inode + idim, fkp1 + numdim_) += shapefct(inode) * val;
         }
       }
@@ -2542,6 +2635,20 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors_od(con
             (*stiffmatrix)(numdim_* inode + idim, (numdim_ + 1) * jnode + jdim) +=
                 val * shapefct(inode);
         }
+      }
+    }
+  }
+  if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+  {
+    const double fac = 0.5 * detJ_w * a * J;
+    for (int idim = 0; idim < numdim_; idim++)
+    {
+      for (int jnode = 0; jnode < numnod_; jnode++)
+      {
+        // TODO document better
+        for (int inode = 0; inode < numnod_; inode++)
+          (*stiffmatrix)(numdim_* inode + idim, (numdim_ + 1) * jnode + idim) +=
+              fac * shapefct(inode);
       }
     }
   }

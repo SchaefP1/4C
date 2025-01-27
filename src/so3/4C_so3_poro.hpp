@@ -459,7 +459,8 @@ namespace Discret
           const Core::LinAlg::Matrix<numdim_ * numdim_, numdof_>& dFinvTdus,
           Core::LinAlg::Matrix<numdof_, numdof_>& erea_v,
           Core::LinAlg::Matrix<numdof_, numdof_>* stiffmatrix,
-          Core::LinAlg::Matrix<numdof_, 1>* force, Core::LinAlg::Matrix<numstr_, 1>& fstress);
+          Core::LinAlg::Matrix<numdof_, 1>* force, Core::LinAlg::Matrix<numstr_, 1>& fstress,
+          Teuchos::ParameterList& params);
 
       //! fill stiffness matrix and rhs vector for brinkman flow
       void fill_matrix_and_vectors_brinkman(const int& gp, const double& J, const double& porosity,
@@ -490,8 +491,8 @@ namespace Discret
       void fill_matrix_and_vectors_od(const int& gp,
           const Core::LinAlg::Matrix<numnod_, 1>& shapefct,
           const Core::LinAlg::Matrix<numdim_, numnod_>& N_XYZ, const double& J,
-          const double& porosity, const double& dphi_dp,
-          const Core::LinAlg::Matrix<numdim_, 1>& velint,
+          const double& porosity, const double& dphi_dp, const double& a, const double& da_dphi,
+          const double& da_dp, const Core::LinAlg::Matrix<numdim_, 1>& velint,
           const Core::LinAlg::Matrix<numdim_, 1>& fvelint,
           const Core::LinAlg::Matrix<numdim_, numdim_>& defgrd_inv,
           const Core::LinAlg::Matrix<numdim_, 1>& Gradp,

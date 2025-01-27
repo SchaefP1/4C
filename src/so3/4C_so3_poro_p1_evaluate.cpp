@@ -627,7 +627,7 @@ void Discret::Elements::So3PoroP1<So3Ele, distype>::gauss_point_loop_p1(
 
     Base::fill_matrix_and_vectors(gp, shapefct, N_XYZ, J, press, porosity, velint, fvelint, fvelder,
         defgrd_inv, bop, C_inv, Finvgradp, dphi_dus, dJ_dus, dCinv_dus, dFinvdus_gradp, dFinvTdus,
-        erea_v, sub_stiff, sub_force, fstress);
+        erea_v, sub_stiff, sub_force, fstress, params);
 
     // **********************evaluate stiffness matrix and force vector+++++++++++++++++++++++++
     double detJ_w = Base::detJ_[gp] * Base::intpoints_.weight(gp);  // gpweights[gp];
@@ -845,8 +845,9 @@ void Discret::Elements::So3PoroP1<So3Ele, distype>::gauss_point_loop_p1_od(
 
     // **********************evaluate stiffness matrix and force vector**********************
 
-    Base::fill_matrix_and_vectors_od(gp, shapefct, N_XYZ, J, porosity, dphi_dp, velint, fvelint,
-        defgrd_inv, Gradp, bop, C_inv, sub_stiff);
+    // TODO do not push like this, make better once it runs
+    Base::fill_matrix_and_vectors_od(gp, shapefct, N_XYZ, J, porosity, dphi_dp, 0.0, 0.0, 0.0,
+        velint, fvelint, defgrd_inv, Gradp, bop, C_inv, sub_stiff);
 
     if (Base::fluid_mat_->type() == Mat::PAR::darcy_brinkman)
     {

@@ -216,6 +216,7 @@ void Discret::Elements::Wall1Poro<distype>::get_materials()
     if (struct_mat_ == nullptr) FOUR_C_THROW("cast to poro material failed");
 
     if (struct_mat_->material_type() != Core::Materials::m_structporo and
+        struct_mat_->material_type() != Core::Materials::m_structporomasstransfer and
         struct_mat_->material_type() != Core::Materials::m_structpororeaction and
         struct_mat_->material_type() != Core::Materials::m_structpororeactionECM)
       FOUR_C_THROW("invalid structure material for poroelasticity");
@@ -248,6 +249,7 @@ void Discret::Elements::Wall1Poro<distype>::get_materials_pressure_based()
     if (struct_mat_ == nullptr) FOUR_C_THROW("cast to poro material failed");
 
     if (struct_mat_->material_type() != Core::Materials::m_structporo and
+        struct_mat_->material_type() != Core::Materials::m_structporomasstransfer and
         struct_mat_->material_type() != Core::Materials::m_structpororeaction and
         struct_mat_->material_type() != Core::Materials::m_structpororeactionECM)
       FOUR_C_THROW("invalid structure material for poroelasticity");

@@ -926,12 +926,25 @@ namespace Discret
               invdefgrd  //!< inverse of deformationgradient at gausspoint
       );
 
+
+      //! compute mass source related terms
+      void ComputeMassSourceTerms(Teuchos::ParameterList& params, int gp);
+
+
       //! compute linearization of spatial reactive term (darcy term) w.r.t to structural
       //! displacements
       void compute_lin_spatial_reaction_terms(
           std::shared_ptr<const Core::Mat::Material> material,  //< fluid material
           const Core::LinAlg::Matrix<nsd_, nsd_>&
               defgrd_inv,  //!< inverse of deformationgradient at gausspoint
+          const Core::LinAlg::Matrix<1, nsd_ * nen_>*
+              dJ_dus,  //!< derivative of jacobian w.r.t. structural displacements at gauss point
+          const Core::LinAlg::Matrix<1, nsd_ * nen_>*
+              dphi_dus  //!< derivative of porosity w.r.t. structural displacements at gauss point
+      );
+
+      //! compute linearization of mass source term w.r.t to structural displacements
+      void ComputeLinMassSourceTermsDus(
           const Core::LinAlg::Matrix<1, nsd_ * nen_>*
               dJ_dus,  //!< derivative of jacobian w.r.t. structural displacements at gauss point
           const Core::LinAlg::Matrix<1, nsd_ * nen_>*
@@ -1100,6 +1113,18 @@ namespace Discret
 
       //! pointer to parameter lists
       Discret::Elements::FluidEleParameterPoro* porofldpara_;
+
+
+
+      //! fluid momentum source caused by mass transfer between fluid and solid
+      Core::LinAlg::Matrix<nsd_, 1> fluid_mom_source_;
+
+      //! mass source factor a at gp
+      double a_;
+      double da_dp_;
+      double da_dphi_;
+      double da_dJ_;
+      Core::LinAlg::Matrix<nsd_, nsd_ * nen_> da_dus_vcon_;
     };
   }  // namespace Elements
 }  // namespace Discret

@@ -20,6 +20,7 @@
 #include "4C_mat_elasthyper.hpp"
 #include "4C_mat_fluidporo.hpp"
 #include "4C_mat_structporo.hpp"
+#include "4C_mat_structporo_masstransfer.hpp"
 #include "4C_mat_stvenantkirchhoff.hpp"
 #include "4C_utils_function.hpp"
 
@@ -1224,6 +1225,11 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
     // get reaction tensor and linearisations of material reaction tensor
     compute_spatial_reaction_terms(material, defgrd_inv);
 
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      ComputeMassSourceTerms(params, *(iquad));
+    }
+
     // get stabilization parameters at integration point
     compute_stabilization_parameters(vol);
 
@@ -1324,6 +1330,43 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
         for (int idim = 0; idim < nsd_; ++idim)
           velforce(idim, vi) -= -rhsfac * Base::funct_(vi) * reac_tensor_gridvel_(idim);
       }
+    }
+
+    /* ********************************************************************** */
+    /* reaction based momentum transfer from skeleton to fluid */
+    /* ********************************************************************** */
+
+    // TODO finish up
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      for (int vi = 0; vi < Base::nen_; ++vi)
+      {
+        for (int idim = 0; idim < Base::nsd_; ++idim)
+          velforce(idim, vi) -= rhsfac * 1.0 / porosity_ * a_ * Base::funct_(vi) *
+                                (Base::velint_(idim) - gridvel_int_(idim));
+      }
+
+      // this should now be unneeded as it is covered elsewhere with lin_resM_Du
+      //      for (int ui = 0; ui < Base::nen_; ++ui)
+      //      {
+      //        const int fui = Base::nsd_ * ui;
+      //
+      //        const double factor_ui = timefacfac * 1.0 / porosity_ * Base::funct_(ui) *
+      //        reactionrate;
+      //
+      //        for (int vi = 0; vi < Base::nen_; ++vi)
+      //        {
+      //          const int fvi = Base::nsd_ * vi;
+      //
+      //          for (int idim = 0; idim < Base::nsd_; ++idim)
+      //          {
+      //            // this is based on the same code for reaction tensor but with reaction rate
+      //            times unit
+      //            // matrix so only diagonal terms and so idim=jdim contributes
+      //            estif_u(fvi + idim, fui + idim) += Base::funct_(vi) * factor_ui;
+      //          }
+      //        }
+      //      }
     }
 
     // convective ALE-part
@@ -1501,6 +1544,31 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
     /* *********************************************************************************************************
      */
 
+    /* ********************************************************************** */
+    /* reaction based mass source */
+    /* ********************************************************************** */
+
+    // TODO I could move this now into EvaluatePressureEquation and should do so once it works
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
+          std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
+
+      for (int vi = 0; vi < Base::nen_; ++vi)
+      {  // check if rhsfac or timefacfacpre makes more sense
+        preforce(vi) += rhsfac * a_ / Base::densaf_ * Base::funct_(vi);
+      }
+
+      for (int vi = 0; vi < Base::nen_; ++vi)
+      {
+        const double factor = -rhsfac * da_dp_ / Base::densaf_ * Base::funct_(vi);
+        for (int ui = 0; ui < Base::nen_; ++ui)
+        {
+          ppmat(vi, ui) += factor * Base::funct_(ui);
+        }
+      }
+    }
+
     // 5) standard Galerkin bodyforce term on right-hand side
     Base::body_force_rhs_term(velforce, rhsfac);
 
@@ -1511,6 +1579,7 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
     // 6) PSPG term
     if (Base::fldpara_->pspg())
     {
+      // std::cout << "Using some stabilisation" << std::endl;
       pspg(estif_q_u, ppmat, preforce, lin_resM_Du, lin_resMRea_Du, lin_resM_Dp, dphi_dp, 0.0,
           timefacfac, timefacfacpre, rhsfac);
     }
@@ -1518,6 +1587,7 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
     // 7) reactive stabilization term
     if (Base::fldpara_->r_stab() != Inpar::FLUID::reactive_stab_none)
     {
+      // std::cout << "Using some stabilisation" << std::endl;
       reac_stab(estif_u, estif_p_v, velforce, lin_resM_Du, lin_resM_Dp, dphi_dp, timefacfac,
           timefacfacpre, rhsfac, 0.0);
     }
@@ -1526,6 +1596,7 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop(Teuchos::Par
     if (porofldpara_->stab_biot() and (not porofldpara_->is_stationary_conti()) and
         struct_mat_->poro_law_type() != Core::Materials::m_poro_law_constant)
     {
+      // std::cout << "Using some stabilisation" << std::endl;
       stab_biot(estif_q_u, ppmat, preforce, lin_resM_Du, lin_resMRea_Du, lin_resM_Dp, dphi_dp, 0.0,
           timefacfac, timefacfacpre, rhsfac);
     }
@@ -1731,6 +1802,12 @@ void Discret::Elements::FluidEleCalcPoro<distype>::gauss_point_loop_od(
     // get material parameters at integration point
     get_material_parameters(material);
 
+    if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+    {
+      ComputeMassSourceTerms(params, *(iquad));
+      ComputeLinMassSourceTermsDus(&dJ_dus, &dphi_dus);
+    }
+
     compute_spatial_reaction_terms(material, defgrd_inv);
 
     // compute linearization of spatial reaction tensor w.r.t. structural displacements
@@ -1844,6 +1921,21 @@ void Discret::Elements::FluidEleCalcPoro<distype>::fill_matrix_momentum_od(const
               timefacfac * reac_tensor_linOD_grid_vel_(idim, nsd_ * ui + jdim);
           lin_resM_Dus_gridvel(idim, nsd_ * ui + jdim) +=
               -fac_densaf * vderxy_idim_jdim * Base::funct_(ui);
+          // TODO check if correct (should be, just want a marker where I change things)
+          //  treating a_ like a*unit matrix again
+          // need to add more here if a is per ref volume but currently it makes more sense
+          //  to have a as current vol TODO: check this
+          // const int gid = nsd_ * ui + jdim; //compare line 5292
+          lin_resM_Dus(idim, nsd_ * ui + jdim) += -timefacfac * dphi_dus(nsd_ * ui + jdim) /
+                                                  porosity_ *
+                                                  fluid_mom_source_(idim);  // the dphi_dus part
+          if (idim == jdim)                          // treat a like unit matrix
+            lin_resM_Dus(idim, nsd_ * ui + jdim) +=  // TODO double check
+                Base::fac_ * (-1.0) * a_ / porosity_ * Base::funct_(ui);  // part from v_s
+          // don't understand why fac_ instead of timefacfac but this is how it is for reac, TODO
+          // try different
+          lin_resM_Dus(idim, nsd_ * ui + jdim) +=
+              +timefacfac * da_dus_vcon_(idim, nsd_ * ui + jdim);  // the da_dus part
         }
       }
     }
@@ -2002,6 +2094,24 @@ void Discret::Elements::FluidEleCalcPoro<distype>::fill_matrix_conti_od(const do
         for (int idim = 0; idim < nsd_; ++idim)
         {
           ecoupl_p(vi, fui + idim) += w * dphi_dJdp * (-Base::rhscon_) * dJ_dus(fui + idim);
+        }
+      }
+    }
+  }
+
+  // TODO check if makes sense, especially the sign
+  if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+  {
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double w = timefacfacpre * Base::funct_(vi) / Base::densaf_;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        const int fui = nsd_ * ui;
+        for (int idim = 0; idim < nsd_; ++idim)
+        {
+          ecoupl_p(vi, fui + idim) +=
+              -w * (da_dJ_ * dJ_dus(fui + idim) + da_dphi_ * dphi_dus(fui + idim));
         }
       }
     }
@@ -2394,11 +2504,48 @@ void Discret::Elements::FluidEleCalcPoro<distype>::lin_3d_mesh_motion_od(
     }
   }
 
+
   //---------reaction term (darcy term)
   {
     const double fac_reac_conv_vel_0 = reac_tensor_convvel_(0) * timefacfac * (1.0 + addstab);
     const double fac_reac_conv_vel_1 = reac_tensor_convvel_(1) * timefacfac * (1.0 + addstab);
     const double fac_reac_conv_vel_2 = reac_tensor_convvel_(2) * timefacfac * (1.0 + addstab);
+
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double funct_vi = Base::funct_(vi, 0);
+      const double v0 = fac_reac_conv_vel_0 * funct_vi;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ecoupl_u(vi * 3, ui * 3) += v0 * Base::derxy_(0, ui);
+        ecoupl_u(vi * 3, ui * 3 + 1) += v0 * Base::derxy_(1, ui);
+        ecoupl_u(vi * 3, ui * 3 + 2) += v0 * Base::derxy_(2, ui);
+      }
+
+      const double v1 = fac_reac_conv_vel_1 * funct_vi;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ecoupl_u(vi * 3 + 1, ui * 3) += v1 * Base::derxy_(0, ui);
+        ecoupl_u(vi * 3 + 1, ui * 3 + 1) += v1 * Base::derxy_(1, ui);
+        ecoupl_u(vi * 3 + 1, ui * 3 + 2) += v1 * Base::derxy_(2, ui);
+      }
+
+      const double v2 = fac_reac_conv_vel_2 * funct_vi;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ecoupl_u(vi * 3 + 2, ui * 3) += v2 * Base::derxy_(0, ui);
+        ecoupl_u(vi * 3 + 2, ui * 3 + 1) += v2 * Base::derxy_(1, ui);
+        ecoupl_u(vi * 3 + 2, ui * 3 + 2) += v2 * Base::derxy_(2, ui);
+      }
+    }
+  }
+
+  // TODO makes sense?
+  //---------mass source term
+  {
+    const double fac_reac_conv_vel_0 = fluid_mom_source_(0) * timefacfac * (1.0 + addstab);
+    const double fac_reac_conv_vel_1 = fluid_mom_source_(1) * timefacfac * (1.0 + addstab);
+    const double fac_reac_conv_vel_2 = fluid_mom_source_(2) * timefacfac * (1.0 + addstab);
 
     for (int vi = 0; vi < nen_; ++vi)
     {
@@ -3436,6 +3583,21 @@ void Discret::Elements::FluidEleCalcPoro<distype>::lin_mesh_motion_3d_pres_od(
     }
   }
 
+  // mass source term
+  if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+  {
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double v = -timefacfac * Base::funct_(vi, 0) * a_ / Base::densaf_;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ecoupl_p(vi, ui * 3) += v * Base::derxy_(0, ui);
+        ecoupl_p(vi, ui * 3 + 1) += v * Base::derxy_(1, ui);
+        ecoupl_p(vi, ui * 3 + 2) += v * Base::derxy_(2, ui);
+      }
+    }
+  }
+
   //-------------------
   if (Base::fldpara_->pspg())
   {
@@ -3891,6 +4053,27 @@ void Discret::Elements::FluidEleCalcPoro<distype>::lin_2d_mesh_motion_od(
     }
   }
 
+  // TODO makes sense?
+  //---------mass source
+  {
+    const double fac_reac_conv_vel_0 = fluid_mom_source_(0) * timefacfac * (1.0 + addstab);
+    const double fac_reac_conv_vel_1 = fluid_mom_source_(1) * timefacfac * (1.0 + addstab);
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double funct_vi = Base::funct_(vi, 0);
+      const double v0 = fac_reac_conv_vel_0 * funct_vi;
+      const double v1 = fac_reac_conv_vel_1 * funct_vi;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ecoupl_u(vi * 2, ui * 2) += v0 * Base::derxy_(0, ui);
+        ecoupl_u(vi * 2, ui * 2 + 1) += v0 * Base::derxy_(1, ui);
+
+        ecoupl_u(vi * 2 + 1, ui * 2) += v1 * Base::derxy_(0, ui);
+        ecoupl_u(vi * 2 + 1, ui * 2 + 1) += v1 * Base::derxy_(1, ui);
+      }
+    }
+  }
+
   const double vderiv_0_0 = Base::vderiv_(0, 0);
   const double vderiv_0_1 = Base::vderiv_(0, 1);
   const double vderiv_1_0 = Base::vderiv_(1, 0);
@@ -4146,6 +4329,20 @@ void Discret::Elements::FluidEleCalcPoro<distype>::lin_mesh_motion_2d_pres_od(
     for (int vi = 0; vi < nen_; ++vi)
     {
       const double v = -1.0 * timefacfac * Base::funct_(vi, 0) * dphi_dp * Base::rhscon_;
+      for (int ui = 0; ui < nen_; ++ui)
+      {
+        ecoupl_p(vi, ui * 2) += v * Base::derxy_(0, ui);
+        ecoupl_p(vi, ui * 2 + 1) += v * Base::derxy_(1, ui);
+      }
+    }
+  }
+
+  // mass source term
+  if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
+  {
+    for (int vi = 0; vi < nen_; ++vi)
+    {
+      const double v = -timefacfac * Base::funct_(vi, 0) * a_ / Base::densaf_;
       for (int ui = 0; ui < nen_; ++ui)
       {
         ecoupl_p(vi, ui * 2) += v * Base::derxy_(0, ui);
@@ -4614,6 +4811,7 @@ void Discret::Elements::FluidEleCalcPoro<distype>::pspg(
   }
 }
 
+
 template <Core::FE::CellType distype>
 void Discret::Elements::FluidEleCalcPoro<distype>::stab_biot(
     Core::LinAlg::Matrix<nen_, nen_ * nsd_>& estif_q_u, Core::LinAlg::Matrix<nen_, nen_>& ppmat,
@@ -4933,6 +5131,7 @@ void Discret::Elements::FluidEleCalcPoro<distype>::get_struct_material(
     {
       struct_mat_ = std::dynamic_pointer_cast<Mat::StructPoro>(ele->material(1));
       if (struct_mat_->material_type() != Core::Materials::m_structporo and
+          struct_mat_->material_type() != Core::Materials::m_structporomasstransfer and
           struct_mat_->material_type() != Core::Materials::m_structpororeaction and
           struct_mat_->material_type() != Core::Materials::m_structpororeactionECM)
         FOUR_C_THROW("invalid structure material for poroelasticity");
@@ -4956,7 +5155,7 @@ void Discret::Elements::FluidEleCalcPoro<distype>::reac_stab(
   //           lin_resM_Du,
   //           timefacfac,
   //           timefacfacpre,
-  //           rhsfac,
+  //           rhsfac,s
   //           fac3);
 
   // do almost the same as the standard implementation
@@ -5182,6 +5381,29 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_spatial_reaction_term
   lin_p_vel_grid_.multiply(lin_p_tmp_2, gridvel_int_);
 }
 
+
+template <Core::FE::CellType distype>
+void Discret::Elements::FluidEleCalcPoro<distype>::ComputeMassSourceTerms(
+    Teuchos::ParameterList& params, int gp)
+{
+  std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =
+      std::dynamic_pointer_cast<Mat::StructPoroMasstransfer>(struct_mat_);
+
+  // TODO remove this once it works and replace by a_ etc directly
+  double reactionrate, reactionrate_derivi, da_dphi, da_dJ;
+
+  masstransfer_mat->ComputeMasstransfer(
+      params, press_, gp, reactionrate, reactionrate_derivi, da_dphi, da_dJ);
+
+  fluid_mom_source_.update(reactionrate / porosity_, convvel_);
+
+  a_ = reactionrate;
+  da_dp_ = reactionrate_derivi;
+  da_dphi_ = da_dphi;
+  da_dJ_ = da_dJ;
+}
+
+
 template <Core::FE::CellType distype>
 void Discret::Elements::FluidEleCalcPoro<distype>::compute_lin_spatial_reaction_terms(
     std::shared_ptr<const Core::Mat::Material> material,
@@ -5315,6 +5537,47 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_lin_spatial_reaction_
   }
 }
 
+
+template <Core::FE::CellType distype>
+void Discret::Elements::FluidEleCalcPoro<distype>::ComputeLinMassSourceTermsDus(
+    const Core::LinAlg::Matrix<1, nsd_ * nen_>* dJ_dus,
+    const Core::LinAlg::Matrix<1, nsd_ * nen_>* dphi_dus)
+{
+  da_dus_vcon_.clear();
+
+  // check for constant or not given derivatives
+  const bool const_phi = (dphi_dus == nullptr);
+  const bool const_J = (dJ_dus == nullptr);
+
+
+  for (int idim = 0; idim < nsd_; ++idim)
+  {
+    const double convvel_idim = convvel_(idim);
+
+    for (int jdim = 0; jdim < nsd_; ++jdim)
+    {
+      for (int inode = 0; inode < nen_; ++inode)
+      {
+        double val_lin_masssource_dus_conv = 0.0;
+
+        const int gid = nsd_ * inode + jdim;
+
+        if (!const_J)
+        {
+          val_lin_masssource_dus_conv += (*dJ_dus)(gid)*da_dJ_ / porosity_ * convvel_idim;
+        }
+        if (!const_phi)
+        {
+          val_lin_masssource_dus_conv += (*dphi_dus)(gid)*da_dphi_ / porosity_ * convvel_idim;
+        }
+
+        da_dus_vcon_(idim, gid) += val_lin_masssource_dus_conv;  // TODO I am not happy how this is
+                                                                 // done, change once it works
+      }
+    }
+  }
+}
+
 template <Core::FE::CellType distype>
 void Discret::Elements::FluidEleCalcPoro<distype>::compute_old_rhs_and_subgrid_scale_velocity()
 {
@@ -5330,10 +5593,10 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_old_rhs_and_subgrid_s
     // evaluate momentum residual once for all stabilization right hand sides
     for (int rr = 0; rr < nsd_; ++rr)
     {
-      Base::momres_old_(rr) = Base::densam_ * Base::accint_(rr) +
-                              Base::densaf_ * Base::conv_old_(rr) + Base::gradp_(rr) -
-                              2.0 * Base::visceff_ * Base::visc_old_(rr) +
-                              reac_tensor_convvel_(rr) - Base::densaf_ * Base::bodyforce_(rr);
+      Base::momres_old_(rr) =
+          Base::densam_ * Base::accint_(rr) + Base::densaf_ * Base::conv_old_(rr) +
+          Base::gradp_(rr) - 2.0 * Base::visceff_ * Base::visc_old_(rr) + reac_tensor_convvel_(rr) +
+          fluid_mom_source_(rr) - Base::densaf_ * Base::bodyforce_(rr);
     }
   }
   else
@@ -5355,13 +5618,13 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_old_rhs_and_subgrid_s
         /*Base::momres_old_(rr) = Base::densaf_*Base::velint_(rr)/Base::fldparatimint_->Dt()
                            +Base::fldparatimint_->Theta()*(Base::densaf_*conv_old_(rr)+Base::gradp_(rr)
                            -2*Base::visceff_*visc_old_(rr)+Base::reacoeff_*Base::velint_(rr))-Base::rhsmom_(rr);*/
-        Base::momres_old_(rr) =
-            ((Base::densaf_ * Base::velint_(rr) / Base::fldparatimint_->dt() +
-                 Base::fldparatimint_->theta() *
-                     (Base::densaf_ * Base::conv_old_(rr) + Base::gradp_(rr) -
-                         2.0 * Base::visceff_ * Base::visc_old_(rr) + reac_tensor_convvel_(rr))) /
-                Base::fldparatimint_->theta()) -
-            Base::rhsmom_(rr);
+        Base::momres_old_(rr) = ((Base::densaf_ * Base::velint_(rr) / Base::fldparatimint_->dt() +
+                                     Base::fldparatimint_->theta() *
+                                         (Base::densaf_ * Base::conv_old_(rr) + Base::gradp_(rr) -
+                                             2.0 * Base::visceff_ * Base::visc_old_(rr) +
+                                             reac_tensor_convvel_(rr) + fluid_mom_source_(rr))) /
+                                    Base::fldparatimint_->theta()) -
+                                Base::rhsmom_(rr);
       }
     }
     else
@@ -5375,7 +5638,8 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_old_rhs_and_subgrid_s
       {
         Base::momres_old_(rr) = Base::densaf_ * Base::conv_old_(rr) + Base::gradp_(rr) -
                                 2.0 * Base::visceff_ * Base::visc_old_(rr) +
-                                reac_tensor_convvel_(rr) - Base::rhsmom_(rr);
+                                reac_tensor_convvel_(rr) + fluid_mom_source_(rr) -
+                                Base::rhsmom_(rr);
       }
     }
   }
@@ -5592,6 +5856,10 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_lin_res_m_du(const do
       {
         lin_resMRea_Du(idim * nsd_ + jdim, ui) += v * reac_tensor_(idim, jdim);
         lin_resM_Du(idim * nsd_ + jdim, ui) += v * reac_tensor_(idim, jdim);
+
+        // TODO I treat a_ here like a* unit matrix. This is easy to do without understanding but
+        //  do better before merging etc.
+        if (idim == jdim) lin_resM_Du(idim * nsd_ + jdim, ui) += v * a_ / porosity_;
       }
     }
   }
@@ -5831,6 +6099,15 @@ void Discret::Elements::FluidEleCalcPoro<distype>::compute_lin_res_m_dp(const do
         for (int idim = 0; idim < nsd_; ++idim)
           lin_resM_Dp(idim, ui) += -w1 * lin_p_vel_grid_(idim);
       }
+    }
+  }
+
+  for (int ui = 0; ui < nen_; ++ui)
+  {
+    const double w = Base::funct_(ui) * timefacfacpre * (-dphi_dp / porosity_ + da_dp_);
+    for (int idim = 0; idim < nsd_; ++idim)
+    {
+      lin_resM_Dp(idim, ui) += w * fluid_mom_source_(idim);
     }
   }
 }

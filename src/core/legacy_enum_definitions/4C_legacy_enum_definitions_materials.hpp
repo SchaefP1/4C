@@ -167,13 +167,14 @@ namespace Core::Materials
     m_soret,   ///< material for heat transport due to Fourier-type thermal conduction and the
                ///< Soret effect
     m_spring,  ///< elastic spring (translational or rotational)
-    m_struct_multiscale,      ///<  structural microscale approach
-    m_structporo,             ///< wrapper material for poroelasticity (structure)
-    m_structpororeaction,     ///< wrapper material for poroelasticity (structure)
-    m_structpororeactionECM,  ///< wrapper material for poroelasticity (structure)
-    m_superelast,             ///< Superelastic material behaviour of shape memory alloys
-    m_stvenant,               ///< St.Venant Kirchhoff material
-    m_sutherland,             ///< material with temperature dependence according to Sutherland law
+    m_struct_multiscale,       ///<  structural microscale approach
+    m_structporo,              ///< wrapper material for poroelasticity (structure)
+    m_structporomasstransfer,  ///< wrapper material for poroelasticity (structure)
+    m_structpororeaction,      ///< wrapper material for poroelasticity (structure)
+    m_structpororeactionECM,   ///< wrapper material for poroelasticity (structure)
+    m_superelast,              ///< Superelastic material behaviour of shape memory alloys
+    m_stvenant,                ///< St.Venant Kirchhoff material
+    m_sutherland,              ///< material with temperature dependence according to Sutherland law
     m_thermo_fourier,  ///< (Possibly anisotropic) linear implementation of Fourier's law of heat
                        ///< conduction
     m_thermoplhyperelast,   ///< Temperature-dependent hyperelasticity and von Mises plasticity

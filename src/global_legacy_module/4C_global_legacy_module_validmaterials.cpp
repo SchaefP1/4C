@@ -3184,6 +3184,27 @@ std::shared_ptr<std::vector<std::shared_ptr<Mat::MaterialDefinition>>> Global::v
   }
 
   /*----------------------------------------------------------------------*/
+  // material wrapper for poroelasticity with masstransfer between skeleton and fluid
+  {
+    auto m = std::make_shared<Mat::MaterialDefinition>("MAT_StructPoroMasstransfer",
+        "wrapper for structure porelastic material with masstransfer between sceleton and fluid",
+        Core::Materials::m_structporomasstransfer);
+
+    m->add_component(entry<int>("MATID", {.description = "ID of structure material"}));
+    m->add_component(entry<int>("POROLAWID", {.description = "ID of porosity law"}));
+    m->add_component(
+        entry<double>("INITPOROSITY", {.description = "initial porosity of porous medium"}));
+    m->add_component(
+        entry<int>("FUNCTIONID", {.description = "Id of implemented function for mass transfer "
+                                                 "rate (0: constant, 1: linear in pressure"}));
+    m->add_component(
+        entry<double>("RATECONSTANT", {.description = "constant that determines constant rate/the "
+                                                      "linear factor for linear in pressure"}));
+
+    Mat::append_material_definition(matlist, m);
+  }
+
+  /*----------------------------------------------------------------------*/
   // hyperelastic material for poroelasticity with reaction
   {
     auto m = std::make_shared<Mat::MaterialDefinition>("MAT_StructPoroReaction",
