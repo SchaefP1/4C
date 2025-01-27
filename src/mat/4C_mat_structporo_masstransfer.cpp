@@ -63,7 +63,11 @@ void Mat::StructPoroMasstransfer::poro_setup(
 {
   StructPoro::poro_setup(numgp, container);
   exp_rate_.resize(numgp);
+  masstransferRate_.resize(numgp);
+  masstransfer_dp_.resize(numgp);
   std::fill(exp_rate_.begin(), exp_rate_.end(), 0.0);  // TODO see if there are better ways
+  std::fill(masstransferRate_.begin(), masstransferRate_.end(), 0.0);
+  std::fill(masstransfer_dp_.begin(), masstransfer_dp_.end(), 0.0);
 }
 
 /*----------------------------------------------------------------------*
@@ -119,17 +123,15 @@ void Mat::StructPoroMasstransfer::unpack(Core::Communication::UnpackBuffer& buff
 void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& params, double press,
     int gp, double& masstransferRate, double& masstransfer_dp, double& masstransfer_dphi,
     double& masstransfer_dJ, bool save)
-{
-  double temperature = 0.0;
+{  // std::cout << "begin " << std::endl;
+  double temperature = 1.0;
+  double rho_s = 1.0;
+  double rho_ss = 8520.0;
+  double t_tot = params.get<double>("total time");
   // TODO: do not read from parameter list!
-  if (params.isParameter("scalar"))
-  {
-    Teuchos::RCP<std::vector<double>> scalars =
-        params.get<Teuchos::RCP<std::vector<double>>>("scalar");
-    temperature = scalars->at(0);
-  }
-  std::cout << "Temp is: " << temperature << std::endl;
-  // constant function
+
+  // std::cout << "Temp is: " << temperature << std::endl;
+  //  constant function
   if (params_->functionID_ == 0)
   {
     masstransferRate = params_->rateConstant_ * temperature;
@@ -141,9 +143,42 @@ void Mat::StructPoroMasstransfer::ComputeMasstransfer(Teuchos::ParameterList& pa
     masstransferRate = params_->rateConstant_ * press * temperature;
     masstransfer_dp = params_->rateConstant_ * temperature;
   }
+  else if (params_->functionID_ == 2)
+  {  // std::cout << "t_tot " << t_tot << std::endl;
+
+    if (params.isParameter("scalar"))
+    {
+      Teuchos::RCP<std::vector<double>> scalars =
+          params.get<Teuchos::RCP<std::vector<double>>>("scalar");
+      if (scalars->size() >
+          1)  // in fluid_ele_poro_calc I only have access to one scalar (I know where this happens
+              // but don't know why it is done like this) So I just do the calc in solid when I have
+              // all scalars and then save the result for the gp to reuse in fluid. Horrible hack I
+              // should fix and remains to be seen if it works
+      {
+        double test = scalars->at(0);
+        temperature = scalars->at(1);
+        rho_s = scalars->at(2);
+        if (t_tot >= 0.1)
+        {
+          // std::cout << "temperature " << temperature << " rho_s " << rho_s << " press " << press
+          // << std::endl;
+          masstransferRate_[gp] = -59.9 * exp(-21.17e03 / 8.314 / temperature) *
+                                  (log(press) - 12.919 - log(1.0e05) + 3704.4 / temperature) *
+                                  (rho_ss - rho_s);
+          masstransfer_dp_[gp] =
+              -59.9 * exp(-21.17e03 / 8.314 / temperature) * (1 / press) * (rho_ss - rho_s);
+          // std::cout << "passed " << std::endl;
+        }
+      }
+      masstransferRate = masstransferRate_[gp];
+      masstransfer_dp = masstransfer_dp_[gp];
+    }
+  }
   else
     FOUR_C_THROW(
         "Type of function specified by functionID %d not implemented", params_->functionID_);
+  // std::cout << "end " << std::endl;
 
   exp_rate_[gp] = masstransferRate;  // TODO see if this works well, possibly move into save?
   if (save)

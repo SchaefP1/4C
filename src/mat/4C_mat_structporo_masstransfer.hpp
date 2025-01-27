@@ -179,6 +179,10 @@ namespace Mat
 
     /// current expansion rate at each gp
     std::vector<double> exp_rate_;
+    /// current expansion rate at each gp
+    std::vector<double> masstransferRate_;
+    /// current expansion rate at each gp
+    std::vector<double> masstransfer_dp_;
   };
 
 }  // namespace Mat

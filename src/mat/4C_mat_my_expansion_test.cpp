@@ -22,6 +22,7 @@
 
 FOUR_C_NAMESPACE_OPEN
 
+
 /*----------------------------------------------------------------------*/
 /*----------------------------------------------------------------------*/
 Mat::PAR::MyExpansionTest_ElastHyper::MyExpansionTest_ElastHyper(
@@ -56,17 +57,14 @@ Core::Communication::ParObject* Mat::MyExpansionTest_ElastHyperType::create(
 
 /*----------------------------------------------------------------------*/
 /*----------------------------------------------------------------------*/
-Mat::MyExpansionTest_ElastHyper::MyExpansionTest_ElastHyper()
-    : params_(nullptr), potsumeliso_(0), last_dt_(0), exp_rate_(0)
-{
-}
+Mat::MyExpansionTest_ElastHyper::MyExpansionTest_ElastHyper() : params_(nullptr), potsumeliso_(0) {}
 
 
 /*----------------------------------------------------------------------*/
 /*----------------------------------------------------------------------*/
 Mat::MyExpansionTest_ElastHyper::MyExpansionTest_ElastHyper(
     Mat::PAR::MyExpansionTest_ElastHyper* params)
-    : params_(params), potsumeliso_(0), last_dt_(0), exp_rate_(0)
+    : params_(params), potsumeliso_(0)
 {
   // make sure the referenced materials in material list have quick access parameters
   std::vector<int>::const_iterator m;
@@ -93,9 +91,6 @@ void Mat::MyExpansionTest_ElastHyper::pack(Core::Communication::PackBuffer& data
   int matid = -1;
   if (params_ != nullptr) matid = params_->id();  // in case we are in post-process mode
   add_to_pack(data, matid);
-
-  add_to_pack(data, exp_);
-  add_to_pack(data, exp_rate_);
 
   if (params_ != nullptr)  // summands are not accessible in postprocessing mode
   {
@@ -134,9 +129,6 @@ void Mat::MyExpansionTest_ElastHyper::unpack(Core::Communication::UnpackBuffer& 
   }
 
 
-  extract_from_pack(buffer, exp_);
-  extract_from_pack(buffer, exp_rate_);
-
   if (params_ != nullptr)  // summands are not accessible in postprocessing mode
   {
     // make sure the referenced materials in material list have quick access parameters
@@ -169,13 +161,6 @@ void Mat::MyExpansionTest_ElastHyper::setup(
 {
   // 3D elastin matrix
   for (auto& p : potsumeliso_) p->setup(numgp, container);
-
-
-  // initial expansion
-  exp_.resize(numgp);
-  std::fill(exp_.begin(), exp_.end(), 1.0);
-  // exp_rate_ = params_->exp_rate_;
-  exp_rate_.resize(numgp);
 }
 
 /*----------------------------------------------------------------------*/
@@ -186,13 +171,6 @@ void Mat::MyExpansionTest_ElastHyper::update()
 
   // 3D elastin matrix
   for (auto& p : potsumeliso_) p->update();
-
-  // update my expansion
-  //  TODO this is just a simple linear expansion and needs to replaced by actual exp law
-  for (unsigned i = 0; i < exp_.size(); ++i)  //(auto& exp_gp : exp_)
-  {
-    exp_[i] = exp_[i] + exp_rate_[i] * last_dt_;
-  }
 }
 
 
@@ -203,18 +181,36 @@ void Mat::MyExpansionTest_ElastHyper::evaluate(const Core::LinAlg::Matrix<3, 3>*
     Core::LinAlg::Matrix<6, 1>* stress, Core::LinAlg::Matrix<6, 6>* cmat, const int gp,
     const int eleGID)
 {
-  // time step size
-  last_dt_ = params.get<double>("delta time");
-
   // blank resulting quantities
   // ... even if it is an implicit law that cmat is zero upon input
   stress->clear();
   cmat->clear();
 
-  // set-up inverse expansion tensor
+  double temperature = 1.0;
+  double temperature_0 = 293.15;
+  double rho_s = 0.0;
+  double rho_ss = 1.0;
+  double rho_s0 = 0.0;
+  double scaling_factor = 1.0;
+
+  double alpha_temp = 13.0e-6;  // this is the value for steel just to test
+  double alpha_reaction = 0.065;
+
+  // TODO: do not read from parameter list!
+  if (params.isParameter("scalar"))
+  {
+    std::shared_ptr<std::vector<double>> scalars =
+        params.get<std::shared_ptr<std::vector<double>>>("scalar");
+    temperature = scalars->at(1);
+    rho_s = scalars->at(2);
+  }
+  scaling_factor = (1.0 + alpha_temp * (temperature - temperature_0)) *
+                   (1.0 + alpha_reaction * (rho_s - rho_s0) / (rho_ss - rho_s0));
+  // std::cout << "scaling_factor " << scaling_factor << std::endl;
+  //  set-up inverse expansion tensor
   Core::LinAlg::Matrix<3, 3> iFexpM(true);
   for (int i = 0; i < 3; ++i) iFexpM(i, i) = 1.0;
-  iFexpM.scale(1 / exp_[gp]);
+  iFexpM.scale(1 / scaling_factor);
 
   // some variables
   static Core::LinAlg::Matrix<6, 1> iCinv(true);

@@ -1108,7 +1108,12 @@ void Discret::Elements::So3Poro<So3Ele, distype>::coupling_stress_poroelast(
   // get structure material
   std::shared_ptr<Mat::StructPoro> structmat =
       std::dynamic_pointer_cast<Mat::StructPoro>(material());
-  if (structmat->material_type() != Core::Materials::m_structporo)
+  if (structmat->material_type() != Core::Materials::m_structporo and
+      structmat->material_type() != Core::Materials::m_structporomasstransfer and
+      structmat->material_type() != Core::Materials::m_structpororeaction and
+      structmat->material_type() !=
+          Core::Materials::m_structpororeactionECM)  // I changed this, not sure why suddenly needed
+                                                     // nor if it makes sense
     FOUR_C_THROW("invalid structure material for poroelasticity");
 
   Core::LinAlg::Matrix<numnod_, 1> shapefct;
@@ -1949,6 +1954,7 @@ void Discret::Elements::So3Poro<So3Ele, distype>::fill_matrix_and_vectors(const 
     double da_dp = 0.0;  // unused except for OD so not here?
     double da_dphi = 0.0;
     double da_dJ = 0.0;
+
     if (struct_mat_->material_type() == Core::Materials::m_structporomasstransfer)
     {
       std::shared_ptr<Mat::StructPoroMasstransfer> masstransfer_mat =

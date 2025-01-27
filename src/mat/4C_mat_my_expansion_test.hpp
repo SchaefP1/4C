@@ -194,12 +194,6 @@ namespace Mat
     /// update
     void update() override;
 
-    /// set exp_rate_
-    void SetExpRate(std::vector<double> exp_rate_in)
-    {
-      exp_rate_ = exp_rate_in;
-    }  // TODO needs a dimension check
-
     /// Return quick accessible material parameter data
     Core::Mat::PAR::Parameter* parameter() const override { return params_; }
 
@@ -216,15 +210,6 @@ namespace Mat
 
     /// Map to elastin 3d matrix material summands
     std::vector<std::shared_ptr<Mat::Elastic::Summand>> potsumeliso_;
-
-    /// Last time step size
-    double last_dt_;
-
-    /// expansion rate
-    std::vector<double> exp_rate_;
-
-    /// current expansion at each gp
-    std::vector<double> exp_;
   };
 
 }  // namespace Mat
