@@ -173,11 +173,33 @@ void PoroElastScaTra::PoroScatraBase::set_velocity_fields()
     velnp = volcoupl_fluidscatra_->apply_vector_mapping21(*poro_->fluid_field()->velnp());
   }
 
-  scatra_->scatra_field()->set_velocity_field(convel,  // convective vel.
-      nullptr,                                         // acceleration
-      velnp,                                           // velocity
-      nullptr,                                         // fsvel
-      true                                             // set pressure
+  // Modify the vector to set velocity to zero while keeping p
+  std::shared_ptr<Core::LinAlg::Vector<double>> zero_convel_ptr =
+      std::make_shared<Core::LinAlg::Vector<double>>(*convel);
+
+  // Get the local portion of the vector
+  int local_length = zero_convel_ptr->MyLength();
+  // Get the starting global index for this processor
+  int global_start = zero_convel_ptr->Map().MinMyGID();
+
+  // Modify only the local portion of the vector
+  for (int i = 0; i < local_length; i++)
+  {
+    // Calculate the corresponding global index
+    int global_index = global_start + i;
+
+    // Check if this is a pressure component (every 4th entry)
+    if ((global_index + 1) % 4 != 0)
+    {
+      (*zero_convel_ptr)[i] = 0.0;  // Note: using local index i here
+    }
+  }
+
+  scatra_->scatra_field()->set_velocity_field(zero_convel_ptr,  // convective vel.
+      nullptr,                                                  // acceleration
+      velnp,                                                    // velocity
+      nullptr,                                                  // fsvel
+      true                                                      // set pressure
   );
 }
 

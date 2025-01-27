@@ -147,6 +147,8 @@ void Discret::Elements::ScaTraEleCalcPoro<distype>::extract_element_and_node_val
   const std::shared_ptr<const Core::LinAlg::Vector<double>> convel =
       discretization.get_state(ndsvel, "convective velocity field");
 
+  // this is where p is set, normally everything is fine TODO delete this comment
+
   // safety check
   if (convel == nullptr) FOUR_C_THROW("Cannot get state vector convective velocity");
 

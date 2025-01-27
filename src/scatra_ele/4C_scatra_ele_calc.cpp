@@ -555,6 +555,8 @@ void Discret::Elements::ScaTraEleCalc<distype, probdim>::sysmat(Core::Elements::
       Core::LinAlg::Matrix<nsd_, 1> fsgradphi(true);
       if (turbparams_->fssgd()) fsgradphi.multiply(derxy_, fsphinp_[k]);
 
+      // This seems like an interesting point to understand better TODO delete this comment
+
       // compute rhs containing bodyforce (divided by specific heat capacity) and,
       // for temperature equation, the time derivative of thermodynamic pressure,
       // if not constant, and for temperature equation of a reactive
